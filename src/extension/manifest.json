@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "FloatingYT Player Integration",
+  "version": "2.0.0",
+  "description": "Isolated player styling and event reporting for FloatingYT",
+  "content_scripts": [
+    {
+      "matches": ["https://*.youtube.com/*", "https://*.youtube-nocookie.com/*"],
+      "js": ["response-filter-main.js"],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://*.youtube.com/*", "https://*.youtube-nocookie.com/*", "https://consent.google.com/*"],
+      "js": ["content.js"],
+      "css": ["youtube.css"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ]
+}
+

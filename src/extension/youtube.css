@@ -1,0 +1,99 @@
+.video-ads, .ytp-ad-module, .ytp-ad-overlay-container, .ytp-ad-player-overlay,
+#player-ads, #masthead-ad, ytd-ad-slot-renderer, ytd-banner-promo-renderer,
+ytd-promoted-video-renderer, ytd-display-ad-renderer, .ytp-ad-preview-container,
+.ytp-ad-message-container { display: none !important; }
+
+:root { --floating-timeline-bottom: clamp(10px, 2.2vh, 26px); }
+#__floating-sharpen-filters { position: fixed; width: 0; height: 0; pointer-events: none; }
+html.__floating-sharpen video { filter: url(#__floating-sharpen-windowed) !important; }
+html.__floating-sharpen.__floating-fullscreen video { filter: url(#__floating-sharpen-fullscreen) !important; }
+
+.ytp-chrome-top, .ytp-gradient-top, .ytp-title, .ytp-watermark, .ytp-youtube-button,
+.ytp-share-button, .ytp-watch-later-button, .ytp-overflow-button, .ytp-pause-overlay,
+.ytp-suggestion-set, .ytp-endscreen-content, .ytp-ce-element, .ytp-cards-button,
+.ytp-prev-button, .ytp-previous-button, .ytp-next-button, .ytp-mute-button,
+.ytp-volume-panel, .ytp-volume-area, .ytp-subtitles-button, .ytp-settings-button,
+.ytp-fullscreen-button, .ytp-size-button, .ytp-popup.ytp-settings-menu, .ytp-unmute,
+embedded-player-video-details, .ytmVideoInfoHost, .ytmVideoInfoVideoDetailsContainer,
+.ytmVideoInfoChannelContainer, .ytmVideoInfoChannelAvatar, .ytwPlayerTopControlsPlayerControlsTopLeft,
+.player-settings-icon, .player-controls-bottom-right, .ytdVolumeControlsHost,
+.ytdVolumeControlsMuteIconButton, .ytmClosedCaptioningButtonButton,
+.ytmFullscreenRelatedVideosEntryPointViewModelButton, .fullscreen-action-menu,
+player-controls-volume-slider, player-controls-mute-button, player-controls-subtitles-button,
+player-controls-fullscreen-button, player-controls-previous-button, player-controls-next-button,
+button[aria-label*="volume" i], button[aria-label*="lautstärke" i],
+button[aria-label*="mute" i], button[aria-label*="stumm" i],
+button[aria-label*="subtitles" i], button[aria-label*="untertitel" i],
+button[aria-label^="fullscreen" i], button[aria-label^="vollbild" i],
+button[aria-label*="theater mode" i], button[aria-label*="theatre mode" i],
+button[aria-label*="kinomodus" i] { display: none !important; }
+
+.ytp-chrome-bottom, .ytp-gradient-bottom, .player-controls-bottom,
+player-middle-controls, yt-progress-bar, .player-controls-background-container {
+  transition: opacity 90ms linear !important;
+}
+html.__floating-controls-hidden .ytp-chrome-bottom,
+html.__floating-controls-hidden .ytp-gradient-bottom,
+html.__floating-controls-hidden .player-controls-bottom,
+html.__floating-controls-hidden player-middle-controls,
+html.__floating-controls-hidden yt-progress-bar,
+html.__floating-controls-hidden .player-controls-background-container {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.ytp-progress-bar-container, yt-progress-bar, .ytPlayerProgressBarHost,
+player-controls-progress-bar, ytw-progress-bar,
+[role="slider"][aria-label*="video progress" i],
+[role="slider"][aria-label*="wiedergabefortschritt" i] {
+  position: fixed !important;
+  left: 10px !important;
+  right: 10px !important;
+  top: auto !important;
+  bottom: var(--floating-timeline-bottom) !important;
+  width: calc(100vw - 20px) !important;
+  max-width: none !important;
+  margin: 0 !important;
+  transform: none !important;
+  z-index: 70 !important;
+}
+.player-controls-bottom-left {
+  position: fixed !important;
+  left: 10px !important;
+  bottom: calc(var(--floating-timeline-bottom) + 5px) !important;
+  width: max-content !important;
+}
+.html5-video-player, .html5-video-container, video.video-stream, video.html5-main-video {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+}
+video.video-stream, video.html5-main-video {
+  position: absolute !important;
+  inset: 0 !important;
+  object-fit: contain !important;
+}
+html.__floating-near-fit video.video-stream,
+html.__floating-near-fit video.html5-main-video {
+  object-fit: cover !important;
+}
+
+html, body { overflow: hidden !important; background: #000 !important; }
+#masthead-container, #secondary, #below, #chat, #comments, ytd-masthead,
+tp-yt-app-drawer, #guide, ytd-mini-guide-renderer, #related, #meta, #info,
+ytd-live-chat-frame, #clarify-box { display: none !important; }
+ytd-app, ytd-page-manager, ytd-watch-flexy, #columns, #primary, #primary-inner,
+#player, #player-container-outer, #player-container-inner, #player-container,
+#movie_player, .html5-video-player {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100vw !important;
+  max-width: none !important;
+}
+ytd-watch-flexy #player-container-outer, ytd-watch-flexy #player-container,
+ytd-watch-flexy #movie_player, ytd-watch-flexy[theater] #player-theater-container {
+  height: 100vh !important;
+  min-height: 100vh !important;
+  inset: 0 !important;
+}

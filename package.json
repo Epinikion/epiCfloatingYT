@@ -1,0 +1,57 @@
+{
+  "name": "floating-yt",
+  "version": "2.0.0",
+  "description": "A focused, always-on-top YouTube player for Windows",
+  "main": "src/main/index.cjs",
+  "type": "commonjs",
+  "scripts": {
+    "prestart": "npm run icons",
+    "start": "electron .",
+    "test": "node --test",
+    "check": "node scripts/check-syntax.cjs && npm test",
+    "icons": "node scripts/generate-icons.cjs",
+    "dist": "npm run icons && electron-builder --win portable nsis",
+    "dist:portable": "npm run icons && electron-builder --win portable",
+    "dist:setup": "npm run icons && electron-builder --win nsis"
+  },
+  "author": "Epinikion",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Epinikion/epiCfloatingYT.git"
+  },
+  "devDependencies": {
+    "electron": "^43.4.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "org.nerdwg.floatingyt",
+    "productName": "FloatingYT",
+    "asar": true,
+    "compression": "maximum",
+    "electronLanguages": ["de", "en-US"],
+    "npmRebuild": false,
+    "files": ["src/**", "build/icon.ico", "build/icon.png", "LICENSE", "package.json"],
+    "extraResources": [
+      { "from": "src/extension", "to": "floatingyt-extension" }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        { "target": "portable", "arch": ["x64"] },
+        { "target": "nsis", "arch": ["x64"] }
+      ]
+    },
+    "portable": { "artifactName": "FloatingYT.exe" },
+    "nsis": {
+      "artifactName": "FloatingYT-Setup-${version}.exe",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "FloatingYT",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+    <title>FloatingYT</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="empty">
+    <svg class="symbols" aria-hidden="true">
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></symbol>
+      <symbol id="i-min" viewBox="0 0 24 24"><path d="M5 12h14" /></symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24"><path d="M8 4h8l-1 6 3 3H6l3-3-1-6zM12 13v7" /></symbol>
+      <symbol id="i-prev" viewBox="0 0 24 24"><path d="M18 6L9 12l9 6V6zM6 5v14" /></symbol>
+      <symbol id="i-next" viewBox="0 0 24 24"><path d="M6 6l9 6-9 6V6zM18 5v14" /></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6" /><circle cx="14" cy="7" r="2" /><circle cx="6" cy="17" r="2" /></symbol>
+      <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M9.8 9a2.4 2.4 0 114.1 1.7c-1.2 1.1-1.9 1.4-1.9 3.1M12 17.4h.01" /></symbol>
+      <symbol id="i-volume" viewBox="0 0 24 24"><path d="M5 9v6h4l5 4V5L9 9H5zM17 9a4 4 0 010 6M19 6a8 8 0 010 12" /></symbol>
+      <symbol id="i-volume-mid" viewBox="0 0 24 24"><path d="M5 9v6h4l5 4V5L9 9H5zM17 9a4 4 0 010 6" /></symbol>
+      <symbol id="i-muted" viewBox="0 0 24 24"><path d="M5 9v6h4l5 4V5L9 9H5zM17 10l4 4M21 10l-4 4" /></symbol>
+    </svg>
+
+    <div id="ambient" aria-hidden="true"><div class="ambient-y"><canvas width="80" height="45"></canvas></div></div>
+
+    <main id="stage">
+      <webview id="player" src="about:blank"></webview>
+      <img id="resize-snapshot" alt="" hidden />
+      <section id="welcome">
+        <div class="play-mark">▶</div>
+        <div class="welcome-title">YouTube-Link einfügen</div>
+        <input id="url-input" type="text" spellcheck="false" autocomplete="off" placeholder="https://www.youtube.com/watch?v=…" />
+        <div class="welcome-note">Strg+V fügt direkt aus der Zwischenablage ein</div>
+        <button id="welcome-help" type="button">Hilfe &amp; Tastenkürzel</button>
+      </section>
+    </main>
+
+    <header id="toolbar">
+      <button id="close" title="Schließen (Strg+W)" aria-label="Schließen"><svg><use href="#i-close" /></svg></button>
+      <button id="minimize" title="Minimieren" aria-label="Minimieren"><svg><use href="#i-min" /></svg></button>
+      <button id="pin" title="Immer im Vordergrund (Strg+P)" aria-label="Immer im Vordergrund"><svg><use href="#i-pin" /></svg></button>
+      <button id="previous" class="playlist-only" title="Vorheriges Video (Strg+Links)" aria-label="Vorheriges Video"><svg><use href="#i-prev" /></svg></button>
+      <button id="next" class="playlist-only" title="Nächstes Video (Strg+Rechts)" aria-label="Nächstes Video"><svg><use href="#i-next" /></svg></button>
+      <button id="settings" title="Lautstärke, Qualität, Tempo, Untertitel (Strg+,)" aria-label="Einstellungen"><svg><use href="#i-settings" /></svg></button>
+      <button id="help" title="Hilfe und Tastenkürzel (F1)" aria-label="Hilfe und Tastenkürzel"><svg><use href="#i-help" /></svg></button>
+      <div id="drag-region"><span id="video-title"><span></span></span></div>
+    </header>
+
+    <section id="settings-menu" hidden>
+      <div class="setting-row volume-row">
+        <span class="setting-label">Lautstärke</span>
+        <div class="volume-controls">
+          <button id="volume-toggle" title="Stumm schalten" aria-label="Stumm schalten"><svg><use href="#i-volume" /></svg></button>
+          <input id="volume" type="range" min="0" max="100" value="100" step="1" aria-label="Lautstärke" />
+          <output id="volume-value">100 %</output>
+        </div>
+      </div>
+      <div class="setting-row"><span class="setting-label">Qualität</span><div class="options" id="quality-options"></div></div>
+      <div class="setting-row"><span class="setting-label">Tempo</span><div class="options" id="rate-options"></div></div>
+      <div class="setting-row"><span class="setting-label">Untertitel</span><div class="options" id="caption-options"></div></div>
+      <div class="setting-row" title="Browser-Anmeldung für persönliche Listen wie Mein Mix">
+        <span class="setting-label">Playlist-Login</span><div class="options" id="cookie-options"></div>
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">Hilfe</span>
+        <div class="options"><button id="help-from-settings" type="button">Alle Tastenkürzel &amp; Gesten</button></div>
+      </div>
+    </section>
+
+    <div id="help-overlay" hidden>
+      <section id="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" aria-describedby="help-intro">
+        <header class="help-header">
+          <div>
+            <h2 id="help-title">Hilfe &amp; Tastenkürzel</h2>
+            <p id="help-intro">Globale Tastenkürzel funktionieren auch, wenn der Fokus im Video liegt.</p>
+          </div>
+          <button id="help-close" type="button" title="Hilfe schließen (Esc)" aria-label="Hilfe schließen"><svg><use href="#i-close" /></svg></button>
+        </header>
+        <nav class="help-tabs" role="tablist" aria-label="Hilfebereiche">
+          <button type="button" role="tab" id="help-tab-playback" data-help-tab="playback" aria-controls="help-panel-playback" aria-selected="true">Wiedergabe</button>
+          <button type="button" role="tab" id="help-tab-navigation" data-help-tab="navigation" aria-controls="help-panel-navigation" aria-selected="false" tabindex="-1">Navigation</button>
+          <button type="button" role="tab" id="help-tab-window" data-help-tab="window" aria-controls="help-panel-window" aria-selected="false" tabindex="-1">Fenster</button>
+          <button type="button" role="tab" id="help-tab-mouse" data-help-tab="mouse" aria-controls="help-panel-mouse" aria-selected="false" tabindex="-1">Maus</button>
+        </nav>
+        <div class="help-groups">
+        <section class="help-group" id="help-panel-playback" data-help-panel="playback" role="tabpanel" aria-labelledby="help-tab-playback">
+          <h3>Wiedergabe</h3>
+          <dl>
+            <div><dt><kbd>Leertaste</kbd><span>oder</span><kbd>K</kbd></dt><dd>Wiedergabe / Pause</dd></div>
+            <div><dt><kbd>M</kbd></dt><dd>Ton an / aus</dd></div>
+            <div><dt><kbd>F</kbd></dt><dd>Vollbild an / aus</dd></div>
+            <div><dt><kbd>Esc</kbd></dt><dd>Vollbild oder geöffnetes Menü verlassen</dd></div>
+          </dl>
+        </section>
+        <section class="help-group" id="help-panel-navigation" data-help-panel="navigation" role="tabpanel" aria-labelledby="help-tab-navigation" hidden>
+          <h3>Playlist &amp; Navigation</h3>
+          <dl>
+            <div><dt><kbd>Strg</kbd><span>+</span><kbd>←</kbd></dt><dd>Vorheriger Titel</dd></div>
+            <div><dt><kbd>Strg</kbd><span>+</span><kbd>→</kbd></dt><dd>Nächster Titel</dd></div>
+            <div><dt><kbd>Strg</kbd><span>+</span><kbd>V</kbd></dt><dd>YouTube-Link aus der Zwischenablage laden</dd></div>
+            <div><dt><kbd>Enter</kbd></dt><dd>Link im Eingabefeld laden</dd></div>
+            <div><dt><kbd>Strg</kbd><span>+</span><kbd>L</kbd></dt><dd>Hinweis zum Laden eines Links anzeigen</dd></div>
+          </dl>
+        </section>
+        <section class="help-group" id="help-panel-window" data-help-panel="window" role="tabpanel" aria-labelledby="help-tab-window" hidden>
+          <h3>Fenster &amp; Darstellung</h3>
+          <dl>
+            <div><dt><kbd>Strg</kbd><span>+</span><kbd>P</kbd></dt><dd>Immer im Vordergrund an / aus</dd></div>
+            <div><dt><kbd>Strg</kbd><span>+</span><kbd>↑</kbd><span>/</span><kbd>↓</kbd></dt><dd>Deckkraft erhöhen / verringern</dd></div>
+            <div><dt><kbd>Strg</kbd><span>+</span><kbd>B</kbd></dt><dd>Randlicht an / aus</dd></div>
+            <div><dt><kbd>Strg</kbd><span>+</span><kbd>U</kbd></dt><dd>Bildschärfung an / aus</dd></div>
+            <div><dt><kbd>Strg</kbd><span>+</span><kbd>Shift</kbd><span>+</span><kbd>A</kbd></dt><dd>Seitenverhältnis fixieren / freigeben</dd></div>
+            <div><dt><kbd>Strg</kbd><span>+</span><kbd>,</kbd></dt><dd>Einstellungen öffnen</dd></div>
+            <div><dt><kbd>Strg</kbd><span>+</span><kbd>W</kbd></dt><dd>FloatingYT schließen</dd></div>
+            <div><dt><kbd>F1</kbd></dt><dd>Diese Hilfe öffnen / schließen</dd></div>
+          </dl>
+        </section>
+        <section class="help-group" id="help-panel-mouse" data-help-panel="mouse" role="tabpanel" aria-labelledby="help-tab-mouse" hidden>
+          <h3>Mausgesten</h3>
+          <dl>
+            <div><dt><span class="gesture">Ziehen im Video</span></dt><dd>Fenster verschieben</dd></div>
+            <div><dt><span class="gesture">Doppelklick</span></dt><dd>Vollbild an / aus</dd></div>
+            <div><dt><span class="gesture">Rand / Ecke ziehen</span></dt><dd>Fenstergröße ändern, wenn Randlicht aktiv ist</dd></div>
+            <div><dt><span class="gesture">Oberkante berühren</span></dt><dd>Bedienleiste einblenden</dd></div>
+          </dl>
+        </section>
+        </div>
+      </section>
+    </div>
+
+    <div id="resize-handles" aria-hidden="true">
+      <i data-direction="n"></i><i data-direction="s"></i><i data-direction="e"></i><i data-direction="w"></i>
+      <i data-direction="ne"></i><i data-direction="nw"></i><i data-direction="se"></i><i data-direction="sw"></i>
+    </div>
+    <div id="toast" role="status"></div>
+    <script type="module" src="app.mjs"></script>
+  </body>
+</html>
