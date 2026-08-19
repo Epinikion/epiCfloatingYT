@@ -100,6 +100,9 @@ body.empty #player { visibility: hidden; }
   align-items: center;
   gap: 4px;
   padding-right: 4px;
+  overflow: hidden;
+  border-radius: 12px 12px 0 0;
+  clip-path: inset(0 round 12px 12px 0 0);
   opacity: 0;
   pointer-events: none;
   transition: opacity 150ms ease;
@@ -117,8 +120,7 @@ body.empty #player { visibility: hidden; }
   color: #ccc;
   cursor: pointer;
 }
-#toolbar button:hover { color: #fff; background: rgba(255,255,255,.14); }
-#toolbar #close:hover { background: #e11d48; }
+#toolbar button:hover { color: #e11d48; background: transparent; }
 #pin.off { opacity: .35; }
 .playlist-only { display: none !important; }
 body.has-playlist .playlist-only { display: grid !important; }
@@ -221,6 +223,7 @@ body.glow #resize-handles i { display: block; }
   place-items: center;
   padding: 12px;
   background: transparent;
+  -webkit-app-region: no-drag;
 }
 #help-overlay[hidden] { display: none; }
 #help-overlay::before {

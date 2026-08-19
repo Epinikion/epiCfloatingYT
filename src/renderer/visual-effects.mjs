@@ -5,9 +5,6 @@ export class AmbientLight {
     this.source = document.createElement('canvas');
     this.sourceContext = this.source.getContext('2d', { alpha: false });
     this.hasVideoFrame = false;
-    this.crop = { x: 0, y: 0, width: 80, height: 45 };
-    this.candidateKey = '';
-    this.candidateHits = 0;
   }
 
   paintWelcome() {
@@ -37,24 +34,11 @@ export class AmbientLight {
     this.source.width = frame.width;
     this.source.height = frame.height;
     this.sourceContext.putImageData(new ImageData(rgba, frame.width, frame.height), 0, 0);
-    const candidate = this.#detectContent(rgba, frame.width, frame.height);
-    const key = `${candidate.x},${candidate.y},${candidate.width},${candidate.height}`;
-    if (key === this.candidateKey) this.candidateHits += 1;
-    else {
-      this.candidateKey = key;
-      this.candidateHits = 1;
-    }
-    if (this.candidateHits >= 3) this.crop = candidate;
 
-    const inset = 1;
     this.context.save();
     this.context.globalAlpha = this.hasVideoFrame ? 0.3 : 1;
     this.context.drawImage(
       this.source,
-      this.crop.x + inset,
-      this.crop.y + inset,
-      Math.max(1, this.crop.width - inset * 2),
-      Math.max(1, this.crop.height - inset * 2),
       0,
       0,
       this.canvas.width,
@@ -62,38 +46,6 @@ export class AmbientLight {
     );
     this.context.restore();
     this.hasVideoFrame = true;
-  }
-
-  #detectContent(pixels, width, height) {
-    const activeRow = (y) => {
-      let lit = 0;
-      const begin = Math.floor(width * 0.1);
-      const end = Math.ceil(width * 0.9);
-      for (let x = begin; x < end; x += 1) {
-        const offset = (y * width + x) * 4;
-        if (Math.max(pixels[offset], pixels[offset + 1], pixels[offset + 2]) > 22) lit += 1;
-      }
-      return lit / Math.max(1, end - begin) > 0.16;
-    };
-    const activeColumn = (x) => {
-      let lit = 0;
-      const begin = Math.floor(height * 0.1);
-      const end = Math.ceil(height * 0.9);
-      for (let y = begin; y < end; y += 1) {
-        const offset = (y * width + x) * 4;
-        if (Math.max(pixels[offset], pixels[offset + 1], pixels[offset + 2]) > 22) lit += 1;
-      }
-      return lit / Math.max(1, end - begin) > 0.16;
-    };
-
-    let top = 0, bottom = 0, left = 0, right = 0;
-    while (top < Math.floor(height * 0.24) && !activeRow(top)) top += 1;
-    while (bottom < Math.floor(height * 0.24) && !activeRow(height - 1 - bottom)) bottom += 1;
-    while (left < Math.floor(width * 0.42) && !activeColumn(left)) left += 1;
-    while (right < Math.floor(width * 0.42) && !activeColumn(width - 1 - right)) right += 1;
-    const yInset = top > 1 && bottom > 1 && Math.abs(top - bottom) <= 2 ? Math.min(top, bottom) : 0;
-    const xInset = left > 1 && right > 1 && Math.abs(left - right) <= 3 ? Math.min(left, right) : 0;
-    return { x: xInset, y: yInset, width: width - xInset * 2, height: height - yInset * 2 };
   }
 }
 
@@ -150,4 +102,3 @@ export class ResizeSmoother {
     this.snapshot.removeAttribute('src');
   }
 }
-

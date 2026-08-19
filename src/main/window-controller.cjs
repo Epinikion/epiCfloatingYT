@@ -11,7 +11,7 @@ const {
 } = require('./geometry.cjs');
 
 const HOVER_HEIGHT = 40;
-const AMBIENT_INTERVAL = 120;
+const AMBIENT_INTERVAL = 80;
 const AMBIENT_WIDTH = 80;
 const AMBIENT_HEIGHT = 45;
 const ASPECT_EPSILON = 0.0005;

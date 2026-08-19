@@ -43,6 +43,16 @@ async function main() {
     pending.set(id, { resolve, reject });
     socket.send(JSON.stringify({ id, method, params }));
   });
+  const clickElement = async (selector) => {
+    const pointResult = await command('Runtime.evaluate', {
+      returnByValue: true,
+      expression: `(() => { const rect=document.querySelector(${JSON.stringify(selector)})?.getBoundingClientRect(); return rect ? {x:rect.x+rect.width/2,y:rect.y+rect.height/2} : null; })()`,
+    });
+    const point = pointResult.result.value;
+    if (!point) return;
+    await command('Input.dispatchMouseEvent', { type: 'mousePressed', x: point.x, y: point.y, button: 'left', clickCount: 1 });
+    await command('Input.dispatchMouseEvent', { type: 'mouseReleased', x: point.x, y: point.y, button: 'left', clickCount: 1 });
+  };
 
   await command('Runtime.enable');
   await command('Log.enable');
@@ -61,17 +71,12 @@ async function main() {
     await new Promise((resolve) => setTimeout(resolve, 350));
   }
   if (helpTab) {
-    await command('Runtime.evaluate', { expression: `document.querySelector(${JSON.stringify(`[data-help-tab="${helpTab}"]`)})?.click()` });
+    await clickElement(`[data-help-tab="${helpTab}"]`);
     await new Promise((resolve) => setTimeout(resolve, 120));
   }
   if (clickHelpClose) {
-    const closePoint = await command('Runtime.evaluate', { returnByValue: true, expression: `(() => { const rect=document.querySelector('#help-close')?.getBoundingClientRect(); return rect ? {x:rect.x+rect.width/2,y:rect.y+rect.height/2} : null; })()` });
-    const point = closePoint.result.value;
-    if (point) {
-      await command('Input.dispatchMouseEvent', { type: 'mousePressed', x: point.x, y: point.y, button: 'left', clickCount: 1 });
-      await command('Input.dispatchMouseEvent', { type: 'mouseReleased', x: point.x, y: point.y, button: 'left', clickCount: 1 });
-      await new Promise((resolve) => setTimeout(resolve, 250));
-    }
+    await clickElement('#help-close');
+    await new Promise((resolve) => setTimeout(resolve, 250));
   }
   for (const shortcut of [
     pressF1 && { key: 'F1', code: 'F1' },
