@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('floatingApi', {
   getState: () => ipcRenderer.invoke('app:get-state'),
   resolveStream: (id) => ipcRenderer.invoke('media:resolve-stream', id),
   resolveQueue: (payload) => ipcRenderer.invoke('media:resolve-queue', payload),
+  searchVideos: (query) => ipcRenderer.invoke('video:search', query),
   cookieBrowsers: () => ipcRenderer.invoke('settings:cookie-browsers'),
   setCookieBrowser: (browser) => ipcRenderer.invoke('settings:set-cookie-browser', browser),
   togglePin: () => ipcRenderer.send('window:toggle-pin'),

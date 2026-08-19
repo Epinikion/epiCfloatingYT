@@ -12,6 +12,10 @@ async function main() {
   const pressF1 = process.argv.includes('--press-f1');
   const pressEscape = process.argv.includes('--press-escape');
   const clickHelpClose = process.argv.includes('--click-close');
+  const searchQuery = process.argv.find((argument) => argument.startsWith('--search='))?.slice(9) || '';
+  const playFirstSearchResult = process.argv.includes('--play-first-result');
+  const pressSearch = process.argv.includes('--press-search');
+  const viewport = /^(\d+)x(\d+)$/.exec(process.argv.find((argument) => argument.startsWith('--viewport='))?.slice(11) || '');
   const targets = await fetch(`http://127.0.0.1:${port}/json/list`).then((response) => response.json());
   const target = targets.find((candidate) => candidate.type === 'page' && candidate.title === 'FloatingYT');
   if (!target) throw new Error('FloatingYT renderer target not found');
@@ -56,6 +60,25 @@ async function main() {
 
   await command('Runtime.enable');
   await command('Log.enable');
+  if (viewport) {
+    await command('Emulation.setDeviceMetricsOverride', {
+      width: Number(viewport[1]), height: Number(viewport[2]), deviceScaleFactor: 1, mobile: false,
+    });
+  }
+  if (pressSearch) {
+    await command('Runtime.evaluate', { expression: `document.dispatchEvent(new KeyboardEvent('keydown',{key:'f',code:'KeyF',ctrlKey:true,bubbles:true,cancelable:true}))` });
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  if (searchQuery) {
+    await command('Runtime.evaluate', {
+      expression: `(() => { if(!document.body.classList.contains('empty')&&!document.body.classList.contains('searching'))document.querySelector('#search')?.click();const input=document.querySelector('#url-input');input.value=${JSON.stringify(searchQuery)};input.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:${JSON.stringify(searchQuery)}}));input.focus(); })()`,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 4500));
+  }
+  if (playFirstSearchResult) {
+    await clickElement('.search-result');
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+  }
   if (videoId) {
     await command('Runtime.evaluate', {
       expression: `(() => { const input=document.querySelector('#url-input'); input.value=${JSON.stringify(videoId)}; input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})); return true; })()`,
@@ -103,6 +126,13 @@ async function main() {
         webviewReady: Boolean(document.querySelector('#player')),
         menuHidden: document.querySelector('#settings-menu')?.hidden,
         helpOpen: !document.querySelector('#help-overlay')?.hidden,
+        search: {
+          open: document.body.classList.contains('empty') || document.body.classList.contains('searching'),
+          query: document.querySelector('#url-input')?.value || '',
+          feedback: document.querySelector('#search-feedback')?.textContent || '',
+          resultCount: document.querySelectorAll('.search-result').length,
+          selectedTitle: document.querySelector('.search-result[aria-selected="true"] .search-title')?.textContent || '',
+        },
         helpLayout: helpDialog && !document.querySelector('#help-overlay')?.hidden ? {
           activeTab: document.querySelector('[data-help-tab][aria-selected="true"]')?.dataset.helpTab,
           clientHeight: helpDialog.clientHeight,

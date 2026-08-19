@@ -1,5 +1,6 @@
 import { parseYouTubeInput } from '../shared/youtube-url.mjs';
 import { PlaybackController } from './playback-controller.mjs';
+import { SearchController } from './search-controller.mjs';
 import { AmbientLight, ResizeSmoother } from './visual-effects.mjs';
 
 const QUALITY_LABELS = {
@@ -18,6 +19,7 @@ class FloatingApp {
       'player', 'stage', 'toolbar', 'url-input', 'pin', 'settings-menu', 'settings', 'toast',
       'video-title', 'ambient', 'resize-snapshot', 'volume', 'volume-value', 'volume-toggle',
       'help', 'help-overlay', 'help-dialog', 'help-close', 'welcome-help', 'help-from-settings',
+      'search', 'welcome', 'search-results', 'search-feedback', 'search-clear',
     ].map((id) => [id, document.getElementById(id)]));
     this.titleText = this.elements['video-title'].querySelector('span');
     this.ambient = new AmbientLight(this.elements.ambient.querySelector('canvas'));
@@ -36,6 +38,19 @@ class FloatingApp {
     this.title = '';
     this.optionWishes = new Map();
     this.pendingShortcut = null;
+    this.searchController = new SearchController({
+      api: this.api,
+      elements: {
+        input: this.elements['url-input'],
+        results: this.elements['search-results'],
+        feedback: this.elements['search-feedback'],
+        clear: this.elements['search-clear'],
+        welcome: this.elements.welcome,
+      },
+      onPlay: (value) => Boolean(this.playback?.load(value)),
+      onClose: () => this.#hideToolbar(),
+      isEmpty: () => document.body.classList.contains('empty'),
+    });
   }
 
   async start() {
@@ -66,7 +81,7 @@ class FloatingApp {
     }
     this.layout();
     this.setEmpty(true);
-    if (parseYouTubeInput(state.clipboard)) this.elements['url-input'].value = state.clipboard;
+    if (parseYouTubeInput(state.clipboard)) this.searchController.setValue(state.clipboard);
     this.elements['url-input'].focus();
   }
 
@@ -107,31 +122,14 @@ class FloatingApp {
 
   #bindUi() {
     const input = this.elements['url-input'];
-    input.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        if (this.playback?.load(input.value)) input.blur();
-      } else if (event.key === 'Escape') {
-        event.preventDefault();
-        input.blur();
-        this.#hideToolbar();
-      }
-      event.stopPropagation();
-    });
-    input.addEventListener('paste', (event) => {
-      const text = event.clipboardData?.getData('text') || '';
-      if (!parseYouTubeInput(text)) return;
-      event.preventDefault();
-      input.value = text.trim();
-      this.playback?.load(text);
-      input.blur();
-    });
+    this.searchController.bind();
 
     document.getElementById('close').addEventListener('click', () => this.api.close());
     document.getElementById('minimize').addEventListener('click', () => this.api.minimize());
     this.elements.pin.addEventListener('click', () => this.api.togglePin());
     document.getElementById('previous').addEventListener('click', () => void this.playback?.neighbour(false));
     document.getElementById('next').addEventListener('click', () => void this.playback?.neighbour(true));
+    this.elements.search.addEventListener('click', (event) => { event.stopPropagation(); this.toggleSearch(true); });
     this.elements.settings.addEventListener('click', (event) => { event.stopPropagation(); this.toggleMenu(); });
     this.elements.help.addEventListener('click', (event) => { event.stopPropagation(); this.toggleHelp(); });
     this.elements['welcome-help'].addEventListener('click', () => this.toggleHelp(true));
@@ -146,7 +144,9 @@ class FloatingApp {
     });
     document.addEventListener('keydown', (event) => {
       const key = event.key.toLowerCase();
+      if ((event.ctrlKey || event.metaKey) && ['f', 'l'].includes(key)) { event.preventDefault(); this.toggleSearch(true); return; }
       if (key === 'f1') { event.preventDefault(); this.toggleHelp(); return; }
+      if (!event.ctrlKey && !event.metaKey && !event.altKey && key === '/' && event.target !== input) { event.preventDefault(); this.toggleSearch(true); return; }
       if (event.target === input || event.ctrlKey || event.metaKey || event.altKey) return;
       if (!this.elements['help-overlay'].hidden && key === 'escape') { event.preventDefault(); this.toggleHelp(false); }
       else if (key === ' ' || key === 'k') { event.preventDefault(); this.playback?.togglePlay(); }
@@ -291,7 +291,7 @@ class FloatingApp {
   toggleMenu(force) {
     const menu = this.elements['settings-menu'];
     const show = force === undefined ? menu.hidden : Boolean(force);
-    if (show) this.toggleHelp(false);
+    if (show) { this.toggleHelp(false); this.toggleSearch(false); }
     menu.hidden = !show;
     if (show) void this.#refreshMenu();
   }
@@ -307,8 +307,18 @@ class FloatingApp {
       this.#showToolbar();
     } else if (!overlay.hidden) {
       overlay.hidden = true;
-      (document.body.classList.contains('empty') ? this.elements['welcome-help'] : this.elements.help).focus({ preventScroll: true });
+      (this.searchController.isOpen() ? this.elements['url-input'] : document.body.classList.contains('empty') ? this.elements['welcome-help'] : this.elements.help).focus({ preventScroll: true });
     }
+  }
+
+  toggleSearch(force, initialValue) {
+    const show = force === undefined ? !this.searchController.isOpen() : Boolean(force);
+    if (show) {
+      this.toggleMenu(false);
+      this.toggleHelp(false);
+      this.searchController.open(initialValue);
+      this.#showToolbar();
+    } else if (this.searchController.isOpen()) this.searchController.close();
   }
 
   #selectHelpTab(name) {
@@ -408,17 +418,23 @@ class FloatingApp {
     }
     switch (message?.name) {
       case 'load-url':
-        if (!this.playback?.load(message.url)) this.toast('Zwischenablage enthält keinen YouTube-Link');
+        if (parseYouTubeInput(message.url)) {
+          this.searchController.reset();
+          this.toggleSearch(false);
+          this.playback?.load(message.url);
+        } else this.toggleSearch(true, message.url);
         break;
       case 'play-pause': this.playback?.togglePlay(); break;
       case 'mute': this.playback?.toggleMute(); break;
       case 'next': void this.playback?.neighbour(true); break;
       case 'previous': void this.playback?.neighbour(false); break;
       case 'menu': this.toggleMenu(); break;
+      case 'search': this.toggleSearch(true); break;
       case 'help': this.toggleHelp(); break;
       case 'escape':
         if (!this.elements['help-overlay'].hidden) this.toggleHelp(false);
         else if (!this.elements['settings-menu'].hidden) this.toggleMenu(false);
+        else if (this.searchController.isOpen()) this.toggleSearch(false);
         else this.#hideToolbar();
         break;
       case 'toast': this.toast(message.text); break;

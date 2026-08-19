@@ -6,6 +6,7 @@ const { attachAdBlocker } = require('./adblock.cjs');
 const { LocalPlayerServer } = require('./local-server.cjs');
 const { MediaResolver, MediaSessionRegistry } = require('./media-resolver.cjs');
 const { COOKIE_BROWSERS, StateStore, cookieBrowser } = require('./state-store.cjs');
+const { VideoSearchService } = require('./video-search.cjs');
 const { WindowController } = require('./window-controller.cjs');
 
 const ROOT = path.join(__dirname, '..', '..');
@@ -34,13 +35,14 @@ async function configureYouTubeSession() {
     ? path.join(process.resourcesPath, 'floatingyt-extension')
     : path.join(ROOT, 'src', 'extension');
   await youtubeSession.extensions.loadExtension(extensionDirectory, { allowFileAccess: false });
+  return youtubeSession;
 }
 
 function findStartUrl(argv) {
   return argv.slice(1).find((argument) => /^(https?:\/\/)?([\w-]+\.)*(youtube\.com|youtube-nocookie\.com|youtu\.be)\//i.test(argument)) || null;
 }
 
-function registerIpc({ resolver, sessions }) {
+function registerIpc({ resolver, sessions, search }) {
   ipcMain.handle('app:get-state', () => ({
     ...store.value,
     baseUrl: playerServer.baseUrl,
@@ -65,6 +67,7 @@ function registerIpc({ resolver, sessions }) {
     const index = Number.isSafeInteger(number) && number > 0 && number <= 100_000 ? number : 0;
     return resolver.resolveQueue({ id, list, index });
   });
+  ipcMain.handle('video:search', (_event, query) => search.search(String(query || '')));
   ipcMain.handle('settings:cookie-browsers', () => COOKIE_BROWSERS);
   ipcMain.handle('settings:set-cookie-browser', (_event, value) => {
     store.patch((state) => { state.cookieBrowser = cookieBrowser(value); });
@@ -103,8 +106,9 @@ if (!app.requestSingleInstanceLock()) {
     const resolver = new MediaResolver({ cookieBrowser: () => store.value.cookieBrowser });
     playerServer = new LocalPlayerServer({ playerDirectory: path.join(ROOT, 'src', 'player'), mediaSessions: sessions });
     await playerServer.start();
-    await configureYouTubeSession();
-    registerIpc({ resolver, sessions });
+    const youtubeSession = await configureYouTubeSession();
+    const search = new VideoSearchService({ fetchImpl: youtubeSession.fetch.bind(youtubeSession) });
+    registerIpc({ resolver, sessions, search });
     controller = new WindowController({
       BrowserWindow,
       screen,

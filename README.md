@@ -3,8 +3,8 @@
 # FloatingYT
 
 Ein rahmenloser, immer im Vordergrund bleibender YouTube-Player für Windows –
-mit Ambient Light, eigener kompakter Bedienung, Playlist-Unterstützung und
-mehrstufiger Werbefilterung.
+mit schneller integrierter Videosuche, Ambient Light, eigener kompakter Bedienung,
+Playlist-Unterstützung und mehrstufiger Werbefilterung.
 
 Diese Codebasis ist eine vollständige Neuimplementierung. Sie bildet die
 bewährte Oberfläche der Vorgängerversion nach, trennt aber Fensterverwaltung,
@@ -39,7 +39,8 @@ Die Artefakte heißen `dist/FloatingYT.exe` (portabel) und
 
 ## Bedienung
 
-- Link in das Startfeld einfügen und Enter drücken.
+- Suchbegriff in das Startfeld eingeben und ein Ergebnis mit Maus oder Pfeiltasten/Enter öffnen.
+- YouTube-Links werden im selben Feld automatisch erkannt und direkt geladen.
 - Die Leiste am oberen Videorand erscheint beim Darüberfahren.
 - Freie Fläche in Leiste oder Video verschiebt das Fenster.
 - Doppelklick auf freie Videofläche schaltet Vollbild.
@@ -51,6 +52,7 @@ Die Artefakte heißen `dist/FloatingYT.exe` (portabel) und
 | Kürzel | Wirkung |
 | --- | --- |
 | `Strg+V` | YouTube-Link aus der Zwischenablage laden |
+| `Strg+F` / `Strg+L` | Videosuche öffnen |
 | `Leertaste` / `K` | Play/Pause |
 | `M` | Ton an/aus |
 | `Strg+←` / `Strg+→` | Vorheriges / nächstes Video |
@@ -102,6 +104,11 @@ auch im laufenden Betrieb, Chromium-Browser können ihre Cookie-Datenbank sperre
 | `src/shared/` | gemeinsam genutztes, getestetes YouTube-Linkmodell |
 | `test/` | URL-, Geometrie-, Zustands-, Medien- und Sicherheitsregressionen |
 
+Die Videosuche liest die öffentliche YouTube-Ergebnisseite ohne API-Key, begrenzt
+Antwortgröße und Laufzeit und gibt ausschließlich validierte Video-Metadaten an
+die Oberfläche weiter. Kurze Caches und zusammengefasste parallele Anfragen halten
+die Suche responsiv, ohne unnötige Netzwerkzugriffe.
+
 Die Wiedergabepfade senden Ereignisse für Titel, Format, Fehler und Ende. Der
 Renderer muss den Gast dadurch nicht fortlaufend mit `executeJavaScript`
 abfragen. Navigationsziele, IPC-Kommandos, Listen-IDs und Video-IDs werden an
@@ -114,8 +121,9 @@ und Statusmeldungen; Electron-IPC bleibt auf den Webview-Hauptframe begrenzt.
 ## Ambient Light und Werbefilter
 
 Das gerenderte Playerbild wird im Hauptprozess auf 80×45 Pixel verkleinert.
-Der Renderer erkennt stabile Letterbox-/Pillarbox-Ränder, glättet Bildwechsel
-zeitlich und zeichnet nur die kleine Farbquelle weich hinter die Videofläche.
+Der Renderer erhält Letterbox-/Pillarbox-Ränder, damit schwarze Bildbereiche kein
+falsches Randlicht erzeugen, glättet Bildwechsel zeitlich und zeichnet nur die
+kleine Farbquelle weich hinter die Videofläche.
 Bei deaktiviertem Randlicht, Vollbild oder minimiertem Fenster pausiert die
 Erfassung.
 

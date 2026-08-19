@@ -136,10 +136,7 @@ class WindowController {
       if (url) this.send('app:shortcut', { name: 'load-url', url });
       return true;
     }
-    if (control && key === 'l') {
-      this.send('app:shortcut', { name: 'toast', text: 'YouTube-Link kopieren und Strg+V drücken' });
-      return true;
-    }
+    if (control && ['f', 'l'].includes(key)) { this.send('app:shortcut', { name: 'search' }); return true; }
     if (control && key === 'p') { this.togglePin(); return true; }
     if (control && key === 'w') { this.window.close(); return true; }
     if (control && ['arrowleft', 'arrowright'].includes(key)) {

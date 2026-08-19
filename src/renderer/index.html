@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https://i.ytimg.com; style-src 'self' 'unsafe-inline'; script-src 'self'" />
     <title>FloatingYT</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
@@ -15,6 +15,7 @@
       <symbol id="i-prev" viewBox="0 0 24 24"><path d="M18 6L9 12l9 6V6zM6 5v14" /></symbol>
       <symbol id="i-next" viewBox="0 0 24 24"><path d="M6 6l9 6-9 6V6zM18 5v14" /></symbol>
       <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6" /><circle cx="14" cy="7" r="2" /><circle cx="6" cy="17" r="2" /></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5L21 21" /></symbol>
       <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M9.8 9a2.4 2.4 0 114.1 1.7c-1.2 1.1-1.9 1.4-1.9 3.1M12 17.4h.01" /></symbol>
       <symbol id="i-volume" viewBox="0 0 24 24"><path d="M5 9v6h4l5 4V5L9 9H5zM17 9a4 4 0 010 6M19 6a8 8 0 010 12" /></symbol>
       <symbol id="i-volume-mid" viewBox="0 0 24 24"><path d="M5 9v6h4l5 4V5L9 9H5zM17 9a4 4 0 010 6" /></symbol>
@@ -27,11 +28,18 @@
       <webview id="player" src="about:blank"></webview>
       <img id="resize-snapshot" alt="" hidden />
       <section id="welcome">
-        <div class="play-mark">▶</div>
-        <div class="welcome-title">YouTube-Link einfügen</div>
-        <input id="url-input" type="text" spellcheck="false" autocomplete="off" placeholder="https://www.youtube.com/watch?v=…" />
-        <div class="welcome-note">Strg+V fügt direkt aus der Zwischenablage ein</div>
-        <button id="welcome-help" type="button">Hilfe &amp; Tastenkürzel</button>
+        <div class="welcome-hero"><div class="play-mark">▶</div><div class="welcome-title">Videos suchen</div></div>
+        <div id="search-box">
+          <svg aria-hidden="true"><use href="#i-search" /></svg>
+          <input id="url-input" type="text" role="combobox" aria-autocomplete="list" aria-controls="search-results" aria-expanded="false" spellcheck="false" autocomplete="off" placeholder="YouTube durchsuchen oder Link einfügen …" />
+          <button id="search-clear" type="button" title="Suche leeren" aria-label="Suche leeren" hidden><svg><use href="#i-close" /></svg></button>
+        </div>
+        <div id="search-feedback" class="welcome-note" role="status" aria-live="polite">Suchbegriff eingeben oder YouTube-Link einfügen</div>
+        <div id="search-results" role="listbox" aria-label="Suchergebnisse" hidden></div>
+        <div class="welcome-actions">
+          <span class="welcome-note"><kbd>↑</kbd><kbd>↓</kbd> auswählen · <kbd>Enter</kbd> abspielen</span>
+          <button id="welcome-help" type="button">Hilfe &amp; Tastenkürzel</button>
+        </div>
       </section>
     </main>
 
@@ -41,6 +49,7 @@
       <button id="pin" title="Immer im Vordergrund (Strg+P)" aria-label="Immer im Vordergrund"><svg><use href="#i-pin" /></svg></button>
       <button id="previous" class="playlist-only" title="Vorheriges Video (Strg+Links)" aria-label="Vorheriges Video"><svg><use href="#i-prev" /></svg></button>
       <button id="next" class="playlist-only" title="Nächstes Video (Strg+Rechts)" aria-label="Nächstes Video"><svg><use href="#i-next" /></svg></button>
+      <button id="search" title="Videos suchen (Strg+F)" aria-label="Videos suchen"><svg><use href="#i-search" /></svg></button>
       <button id="settings" title="Lautstärke, Qualität, Tempo, Untertitel (Strg+,)" aria-label="Einstellungen"><svg><use href="#i-settings" /></svg></button>
       <button id="help" title="Hilfe und Tastenkürzel (F1)" aria-label="Hilfe und Tastenkürzel"><svg><use href="#i-help" /></svg></button>
       <div id="drag-region"><span id="video-title"><span></span></span></div>
@@ -98,8 +107,8 @@
             <div><dt><kbd>Strg</kbd><span>+</span><kbd>←</kbd></dt><dd>Vorheriger Titel</dd></div>
             <div><dt><kbd>Strg</kbd><span>+</span><kbd>→</kbd></dt><dd>Nächster Titel</dd></div>
             <div><dt><kbd>Strg</kbd><span>+</span><kbd>V</kbd></dt><dd>YouTube-Link aus der Zwischenablage laden</dd></div>
-            <div><dt><kbd>Enter</kbd></dt><dd>Link im Eingabefeld laden</dd></div>
-            <div><dt><kbd>Strg</kbd><span>+</span><kbd>L</kbd></dt><dd>Hinweis zum Laden eines Links anzeigen</dd></div>
+            <div><dt><kbd>Enter</kbd></dt><dd>Link oder gewähltes Suchergebnis öffnen</dd></div>
+            <div><dt><kbd>Strg</kbd><span>+</span><kbd>F</kbd><span>oder</span><kbd>Strg</kbd><span>+</span><kbd>L</kbd></dt><dd>Videosuche öffnen</dd></div>
           </dl>
         </section>
         <section class="help-group" id="help-panel-window" data-help-panel="window" role="tabpanel" aria-labelledby="help-tab-window" hidden>
