@@ -52,8 +52,10 @@ export function parseYouTubeInput(input) {
   };
 }
 
+// Mixes (RD), Watch Later (WL), Liked (LL) and channel Favourites (FL) cannot
+// be enumerated by the embed, so the app resolves and steps through them itself.
 export function isPersonalPlaylist(list) {
-  return /^(RD|WL|LL)/.test(String(list || ''));
+  return /^(RD|WL|LL|FL)/.test(String(list || ''));
 }
 
 export function buildWatchUrl({ id, list, index = 0, start = 0 }) {

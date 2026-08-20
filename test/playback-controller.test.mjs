@@ -299,3 +299,44 @@ test('keeps the full resolution list after pinning one inside the embed', async 
   controller.load('BBBBBBBBBBB');
   assert.deepEqual((await ask(['hd720', 'auto'], 'hd720')).qualities, ['hd720', 'auto']);
 });
+
+test('resolves a favourites list through the managed queue instead of the embed', async () => {
+  const player = new FakePlayer();
+  const requests = [];
+  const queues = [];
+  const toasts = [];
+  const controller = new PlaybackController({
+    player,
+    baseUrl: 'http://127.0.0.1:3210',
+    api: {
+      resolveQueue: async (request) => {
+        requests.push(request);
+        return { ids: ['v1sRO9wAWD0', 'vWbCtn--6Sg', 'YdYqwJxA-ro'] };
+      },
+    },
+    hooks: {
+      toast: (message) => toasts.push(message),
+      setEmpty() {}, setPlaylist() {}, setTitle() {}, openMenu() {},
+      setQueue: (queue) => queues.push(queue),
+    },
+  });
+
+  controller.load('https://www.youtube.com/watch?v=v1sRO9wAWD0&list=FLXKv1_LurQ_xeA8K1td_uBQ&pp=sAgC');
+  // The embed cannot enumerate a favourites list, so the list must stay out of
+  // the embed URL and be resolved through the media resolver instead.
+  assert.equal(player.src, 'http://127.0.0.1:3210/embed.html?v=v1sRO9wAWD0');
+  await settle();
+  await settle();
+
+  assert.deepEqual(requests, [{ id: 'v1sRO9wAWD0', list: 'FLXKv1_LurQ_xeA8K1td_uBQ', index: 0 }]);
+  assert.deepEqual(controller.current.queue, ['v1sRO9wAWD0', 'vWbCtn--6Sg', 'YdYqwJxA-ro']);
+  assert.equal(queues.at(-1).mode, 'youtube');
+  assert.equal(queues.at(-1).index, 0);
+  assert.equal(queues.at(-1).items.length, 3);
+  assert.ok(toasts.includes('Liste mit 3 Titeln'));
+
+  assert.equal(await controller.neighbour(true), true);
+  assert.equal(player.src, 'http://127.0.0.1:3210/embed.html?v=vWbCtn--6Sg');
+  assert.equal(controller.selectQueue(2), true);
+  assert.equal(player.src, 'http://127.0.0.1:3210/embed.html?v=YdYqwJxA-ro');
+});

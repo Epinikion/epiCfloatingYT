@@ -99,8 +99,8 @@ keinen separaten Direktstrom mehr. FloatingYT wechselt sofort auf die normale,
 auf den Player reduzierte YouTube-Seite. Dadurch gibt es weder eine zusätzliche
 Wartezeit noch einen später abbrechenden Audio-/Videostream.
 
-Persönliche Listen wie „Mein Mix“, „Später ansehen“ und „Gefällt mir“ werden
-weiterhin mit `yt-dlp` aufgelöst. Dafür muss `yt-dlp` im Suchpfad liegen:
+Persönliche Listen wie „Mein Mix“, „Später ansehen“, „Gefällt mir“ und
+„Favoriten“ werden weiterhin mit `yt-dlp` aufgelöst. Dafür muss `yt-dlp` im Suchpfad liegen:
 
 ```powershell
 winget install yt-dlp.yt-dlp

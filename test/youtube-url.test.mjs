@@ -27,7 +27,11 @@ test('parses playlist-only links and human-readable start times', () => {
   assert.equal(parseStartTime('98'), 98);
   assert.equal(parseStartTime('nonsense'), 0);
   assert.equal(isPersonalPlaylist('RDMMabc'), true);
+  assert.equal(isPersonalPlaylist('WLabc'), true);
+  assert.equal(isPersonalPlaylist('LLabc'), true);
+  assert.equal(isPersonalPlaylist('FLXKv1_LurQ_xeA8K1td_uBQ'), true);
   assert.equal(isPersonalPlaylist('PLabc'), false);
+  assert.equal(isPersonalPlaylist('UUabc'), false);
 });
 
 test('builds mode-specific URLs and keeps personal queues out of embeds', () => {
