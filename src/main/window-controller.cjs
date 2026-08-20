@@ -11,6 +11,7 @@ const {
 } = require('./geometry.cjs');
 
 const HOVER_HEIGHT = 40;
+const POINTER_INTERVAL = 60;
 const AMBIENT_INTERVAL = 80;
 const AMBIENT_WIDTH = 80;
 const AMBIENT_HEIGHT = 45;
@@ -52,6 +53,7 @@ class WindowController {
     this.hoverTimer = null;
     this.ambientTimer = null;
     this.ambientBusy = false;
+    this.mousePassthrough = false;
   }
 
   create(startUrl = null) {
@@ -117,6 +119,7 @@ class WindowController {
       clearInterval(this.ambientTimer);
       this.window = null;
       this.guest = null;
+      this.mousePassthrough = false;
     });
     this.#startHoverTracking();
     return window;
@@ -166,6 +169,10 @@ class WindowController {
     }
     if (fromGuest && (key === ' ' || key === 'k')) { this.send('app:shortcut', { name: 'play-pause' }); return true; }
     if (fromGuest && key === 'm') { this.send('app:shortcut', { name: 'mute' }); return true; }
+    if (fromGuest && !control && !input.alt && !input.shift && ['arrowup', 'arrowdown'].includes(key)) {
+      this.send('app:shortcut', { name: 'volume-step', delta: key === 'arrowup' ? 5 : -5 });
+      return true;
+    }
     if (fromGuest && key === 'f') { this.toggleFullscreen(); return true; }
     if (key === 'escape' && (this.fullscreen || this.window.isFullScreen())) { this.leaveFullscreen(); return true; }
     if (key === 'escape') {
@@ -386,13 +393,25 @@ class WindowController {
     this.hoverTimer = setInterval(() => {
       if (!this.window || !this.window.isVisible() || this.window.isMinimized()) return;
       const pointer = this.screen.getCursorScreenPoint();
-      const video = videoRect(this.window.getBounds(), this.store.value.window.aspect, this.store.value.glow);
+      const bounds = this.window.getBounds();
+      const video = videoRect(bounds, this.store.value.window.aspect, this.store.value.glow);
+      const overWindow = pointer.x >= bounds.x && pointer.x < bounds.x + bounds.width
+        && pointer.y >= bounds.y && pointer.y < bounds.y + bounds.height;
+      const overVideo = pointer.x >= video.x && pointer.x < video.x + video.width
+        && pointer.y >= video.y && pointer.y < video.y + video.height;
+      this.#setMousePassthrough(Boolean(this.store.value.glow && !this.fullscreen && overWindow && !overVideo));
       const near = pointer.x >= video.x && pointer.x < video.x + video.width && pointer.y >= video.y && pointer.y < video.y + HOVER_HEIGHT;
       if (near !== previous) {
         previous = near;
         this.send('window:hover', near);
       }
-    }, 120);
+    }, POINTER_INTERVAL);
+  }
+
+  #setMousePassthrough(enabled) {
+    if (!this.window || this.window.isDestroyed() || this.mousePassthrough === enabled) return;
+    this.mousePassthrough = enabled;
+    this.window.setIgnoreMouseEvents(enabled, { forward: true });
   }
 
   #startAmbientCapture() {

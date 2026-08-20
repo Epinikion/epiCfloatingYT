@@ -269,15 +269,15 @@ body.has-playlist .playlist-only { display: grid !important; }
 #resize-handles { position: absolute; inset: 0; z-index: 30; pointer-events: none; }
 #resize-handles i { position: absolute; display: none; pointer-events: auto; touch-action: none; }
 body.glow #resize-handles i { display: block; }
-[data-direction="n"] { left: calc(var(--stage-left) + 12px); top: calc(var(--stage-top) - 7px); width: calc(var(--stage-width) - 24px); height: 7px; cursor: n-resize; }
-[data-direction="s"] { left: calc(var(--stage-left) + 12px); top: calc(var(--stage-top) + var(--stage-height)); width: calc(var(--stage-width) - 24px); height: 7px; cursor: s-resize; }
-[data-direction="w"] { left: calc(var(--stage-left) - 7px); top: calc(var(--stage-top) + 12px); width: 7px; height: calc(var(--stage-height) - 24px); cursor: w-resize; }
-[data-direction="e"] { left: calc(var(--stage-left) + var(--stage-width)); top: calc(var(--stage-top) + 12px); width: 7px; height: calc(var(--stage-height) - 24px); cursor: e-resize; }
+[data-direction="n"] { left: calc(var(--stage-left) + 12px); top: var(--stage-top); width: calc(var(--stage-width) - 24px); height: 7px; cursor: n-resize; }
+[data-direction="s"] { left: calc(var(--stage-left) + 12px); top: calc(var(--stage-top) + var(--stage-height) - 7px); width: calc(var(--stage-width) - 24px); height: 7px; cursor: s-resize; }
+[data-direction="w"] { left: var(--stage-left); top: calc(var(--stage-top) + 12px); width: 7px; height: calc(var(--stage-height) - 24px); cursor: w-resize; }
+[data-direction="e"] { left: calc(var(--stage-left) + var(--stage-width) - 7px); top: calc(var(--stage-top) + 12px); width: 7px; height: calc(var(--stage-height) - 24px); cursor: e-resize; }
 [data-direction="nw"], [data-direction="ne"], [data-direction="sw"], [data-direction="se"] { width: 14px; height: 14px; }
-[data-direction="nw"] { left: calc(var(--stage-left) - 7px); top: calc(var(--stage-top) - 7px); cursor: nw-resize; }
-[data-direction="ne"] { left: calc(var(--stage-left) + var(--stage-width) - 7px); top: calc(var(--stage-top) - 7px); cursor: ne-resize; }
-[data-direction="sw"] { left: calc(var(--stage-left) - 7px); top: calc(var(--stage-top) + var(--stage-height) - 7px); cursor: sw-resize; }
-[data-direction="se"] { left: calc(var(--stage-left) + var(--stage-width) - 7px); top: calc(var(--stage-top) + var(--stage-height) - 7px); cursor: se-resize; }
+[data-direction="nw"] { left: var(--stage-left); top: var(--stage-top); cursor: nw-resize; }
+[data-direction="ne"] { left: calc(var(--stage-left) + var(--stage-width) - 14px); top: var(--stage-top); cursor: ne-resize; }
+[data-direction="sw"] { left: var(--stage-left); top: calc(var(--stage-top) + var(--stage-height) - 14px); cursor: sw-resize; }
+[data-direction="se"] { left: calc(var(--stage-left) + var(--stage-width) - 14px); top: calc(var(--stage-top) + var(--stage-height) - 14px); cursor: se-resize; }
 
 #toast {
   position: absolute;

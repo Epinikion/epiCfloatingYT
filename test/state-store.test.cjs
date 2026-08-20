@@ -22,16 +22,22 @@ test('migrates the legacy flat state and clamps unsafe values', () => {
   assert.deepEqual(state.window, { videoWidth: 800, videoHeight: 450, x: 12, y: 24, aspect: 3 });
   assert.equal(state.opacity, 0.2);
   assert.equal(state.cookieBrowser, 'firefox');
+  assert.equal(state.caption, null);
 });
 
 test('persists and reloads state from an explicit path', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'floatingyt-state-'));
   const file = path.join(directory, 'state.json');
   const store = new StateStore(file);
-  store.patch((state) => { state.pinned = false; state.window.videoWidth = 777; });
+  store.patch((state) => { state.pinned = false; state.window.videoWidth = 777; state.caption = 'de'; });
   store.flush();
   const reloaded = new StateStore(file);
   assert.equal(reloaded.value.pinned, false);
   assert.equal(reloaded.value.window.videoWidth, 777);
+  assert.equal(reloaded.value.caption, 'de');
 });
 
+test('sanitizes and persists the preferred caption track', () => {
+  assert.equal(sanitizeState({ caption: 'de-DE' }).caption, 'de-DE');
+  assert.equal(sanitizeState({ caption: '<script>' }).caption, null);
+});

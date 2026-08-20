@@ -43,11 +43,14 @@ Die Artefakte heißen `dist/FloatingYT.exe` (portabel) und
 - YouTube-Links werden im selben Feld automatisch erkannt und direkt geladen.
 - Die Leiste am oberen Videorand erscheint beim Darüberfahren.
 - Freie Fläche in Leiste oder Video verschiebt das Fenster.
+- Ein einfacher Klick auf die Videofläche verändert die Wiedergabe nicht.
 - Doppelklick auf freie Videofläche schaltet Vollbild.
-- Play/Pause und Zeitleiste bleiben im Video; Lautstärke, Qualität, Tempo und
+- Play/Pause, aktuelle Zeit, Dauer und Zeitleiste bleiben im Video; Lautstärke, Qualität, Tempo und
   Untertitel liegen im Zahnrad-Menü.
+- Untertitel sind zunächst aus; danach wird die zuletzt gewählte Sprache oder „Aus“ gespeichert.
 - Querformat, Shorts und andere Videoformate passen das Fenster automatisch an.
 - Bei aktivem Randlicht sitzen die Resize-Griffe direkt an der Videokante.
+- Der transparente Randlichtbereich ist klickdurchlässig für darunterliegende Fenster.
 
 | Kürzel | Wirkung |
 | --- | --- |
@@ -55,6 +58,7 @@ Die Artefakte heißen `dist/FloatingYT.exe` (portabel) und
 | `Strg+F` / `Strg+L` | Videosuche öffnen |
 | `Leertaste` / `K` | Play/Pause |
 | `M` | Ton an/aus |
+| `↑` / `↓` | Lautstärke in 5-%-Schritten ändern |
 | `Strg+←` / `Strg+→` | Vorheriges / nächstes Video |
 | `Strg+P` | Immer im Vordergrund an/aus |
 | `Strg+,` | Einstellungsmenü |
@@ -71,35 +75,32 @@ automatisch in das neue Format übernommen.
 ## Gesperrte Videos und persönliche Listen
 
 Wenn YouTube einen Embed mit Fehler 100, 101 oder 150 ablehnt, versucht die App
-zuerst einen Direktstrom. Dafür muss `yt-dlp` im Suchpfad liegen:
+keinen separaten Direktstrom mehr. FloatingYT wechselt sofort auf die normale,
+auf den Player reduzierte YouTube-Seite. Dadurch gibt es weder eine zusätzliche
+Wartezeit noch einen später abbrechenden Audio-/Videostream.
+
+Persönliche Listen wie „Mein Mix“, „Später ansehen“ und „Gefällt mir“ werden
+weiterhin mit `yt-dlp` aufgelöst. Dafür muss `yt-dlp` im Suchpfad liegen:
 
 ```powershell
 winget install yt-dlp.yt-dlp
 ```
 
-Bild und Ton werden bei getrennten YouTube-Spuren synchron wiedergegeben. Die
-echten Medienadressen verlassen den Hauptprozess nicht; kurzlebige, zufällige
-lokale Tokens trennen die einzelnen Medien-Sessions. Scheitert ein Direktstrom,
-wechselt FloatingYT kontrolliert auf die normale, auf den Player reduzierte
-YouTube-Seite. Ohne `yt-dlp` werden gesperrte Playlist-Titel übersprungen oder
-ebenfalls auf der Watch-Seite geöffnet.
-
-Persönliche Listen wie „Mein Mix“, „Später ansehen“ und „Gefällt mir“ brauchen
-die YouTube-Anmeldung eines echten Browsers. Der Browser kann im Zahnrad-Menü
-unter **Playlist-Login** gewählt werden. FloatingYT liest die Cookies nicht
-selbst; der Browsername wird ausschließlich an die eingebaute
-`yt-dlp --cookies-from-browser`-Funktion übergeben. Firefox funktioniert meist
+Diese Listen brauchen außerdem die YouTube-Anmeldung eines echten Browsers. Der
+Browser kann im Zahnrad-Menü unter **Playlist-Login** gewählt werden. FloatingYT
+liest die Cookies nicht selbst; der Browsername wird ausschließlich an die
+eingebaute `yt-dlp --cookies-from-browser`-Funktion übergeben. Firefox funktioniert meist
 auch im laufenden Betrieb, Chromium-Browser können ihre Cookie-Datenbank sperren.
 
 ## Architektur
 
 | Bereich | Aufgabe |
 | --- | --- |
-| `src/main/` | App-Lebenszyklus, Fenster, Zustand, lokaler Server, Medienauflösung |
+| `src/main/` | App-Lebenszyklus, Fenster, Zustand, lokaler Player-Server und Listenauflösung |
 | `src/preload/` | kleine, explizite IPC-Brücke für die vertrauenswürdige Oberfläche |
 | `src/guest/` | schmale Electron-Brücke für den jeweiligen Webview-Hauptframe |
 | `src/extension/` | auf YouTube begrenzte Content-Scripts für Unterframes, CSS und Ad-Filter |
-| `src/player/` | lokaler IFrame-API-Player und Direktstrom-Player |
+| `src/player/` | lokaler Host für den YouTube-IFrame-API-Player |
 | `src/renderer/` | Oberfläche, Playback-Zustandsmaschine und Ambient-Renderer |
 | `src/shared/` | gemeinsam genutztes, getestetes YouTube-Linkmodell |
 | `test/` | URL-, Geometrie-, Zustands-, Medien- und Sicherheitsregressionen |

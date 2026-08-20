@@ -4,8 +4,8 @@ const path = require('node:path');
 const { app, BrowserWindow, clipboard, ipcMain, screen, session } = require('electron');
 const { attachAdBlocker } = require('./adblock.cjs');
 const { LocalPlayerServer } = require('./local-server.cjs');
-const { MediaResolver, MediaSessionRegistry } = require('./media-resolver.cjs');
-const { COOKIE_BROWSERS, StateStore, cookieBrowser } = require('./state-store.cjs');
+const { MediaResolver } = require('./media-resolver.cjs');
+const { COOKIE_BROWSERS, StateStore, caption, cookieBrowser } = require('./state-store.cjs');
 const { VideoSearchService } = require('./video-search.cjs');
 const { WindowController } = require('./window-controller.cjs');
 
@@ -42,24 +42,12 @@ function findStartUrl(argv) {
   return argv.slice(1).find((argument) => /^(https?:\/\/)?([\w-]+\.)*(youtube\.com|youtube-nocookie\.com|youtu\.be)\//i.test(argument)) || null;
 }
 
-function registerIpc({ resolver, sessions, search }) {
+function registerIpc({ resolver, search }) {
   ipcMain.handle('app:get-state', () => ({
     ...store.value,
     baseUrl: playerServer.baseUrl,
     clipboard: clipboard.readText().trim(),
   }));
-  ipcMain.handle('media:resolve-stream', async (_event, id) => {
-    const result = await resolver.resolveStream(String(id || ''));
-    if (result.error) return result;
-    const token = sessions.add(result);
-    return {
-      video: `${playerServer.baseUrl}/media/${token}/video`,
-      audio: result.audio ? `${playerServer.baseUrl}/media/${token}/audio` : null,
-      title: result.title,
-      duration: result.duration,
-      height: result.height,
-    };
-  });
   ipcMain.handle('media:resolve-queue', (_event, payload) => {
     const id = String(payload?.id || '');
     const list = String(payload?.list || '');
@@ -72,6 +60,10 @@ function registerIpc({ resolver, sessions, search }) {
   ipcMain.handle('settings:set-cookie-browser', (_event, value) => {
     store.patch((state) => { state.cookieBrowser = cookieBrowser(value); });
     return store.value.cookieBrowser;
+  });
+  ipcMain.handle('settings:set-caption', (_event, value) => {
+    store.patch((state) => { state.caption = caption(value); });
+    return store.value.caption;
   });
 
   ipcMain.on('window:toggle-pin', () => controller?.togglePin());
@@ -102,13 +94,12 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(async () => {
     store = new StateStore(path.join(app.getPath('userData'), 'state.json'));
-    const sessions = new MediaSessionRegistry();
     const resolver = new MediaResolver({ cookieBrowser: () => store.value.cookieBrowser });
-    playerServer = new LocalPlayerServer({ playerDirectory: path.join(ROOT, 'src', 'player'), mediaSessions: sessions });
+    playerServer = new LocalPlayerServer({ playerDirectory: path.join(ROOT, 'src', 'player') });
     await playerServer.start();
     const youtubeSession = await configureYouTubeSession();
     const search = new VideoSearchService({ fetchImpl: youtubeSession.fetch.bind(youtubeSession) });
-    registerIpc({ resolver, sessions, search });
+    registerIpc({ resolver, search });
     controller = new WindowController({
       BrowserWindow,
       screen,

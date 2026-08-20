@@ -29,6 +29,34 @@ class FakePlayer {
 
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
+test('opens the YouTube watch page immediately when an embed is blocked', async () => {
+  const player = new FakePlayer();
+  const toasts = [];
+  let streamResolutions = 0;
+  const controller = new PlaybackController({
+    player,
+    baseUrl: 'http://127.0.0.1:3210',
+    api: {
+      resolveStream() { streamResolutions += 1; },
+      setVideoAspect() {}, dragStart() {}, dragMove() {}, dragEnd() {},
+      toggleFullscreen() {}, leaveFullscreen() {},
+    },
+    hooks: {
+      toast: (message) => toasts.push(message),
+      setEmpty() {}, setPlaylist() {}, setTitle() {}, openMenu() {},
+    },
+  });
+
+  controller.load('AAAAAAAAAAA');
+  player.emitGuest('embed-status', { videoId: 'AAAAAAAAAAA', error: 150, state: -1 });
+  await settle();
+
+  assert.equal(player.src, 'https://www.youtube.com/watch?v=AAAAAAAAAAA');
+  assert.equal(controller.current.mode, 'watch');
+  assert.equal(streamResolutions, 0);
+  assert.deepEqual(toasts, ['Embed gesperrt (150) – YouTube-Seite']);
+});
+
 test('returns from a personal-playlist watch fallback to the managed queue', async () => {
   const player = new FakePlayer();
   const toasts = [];
@@ -60,4 +88,51 @@ test('returns from a personal-playlist watch fallback to the managed queue', asy
   assert.equal(controller.current.mode, 'embed');
   assert.equal(controller.current.index, 2);
   assert.equal(toasts.includes('Ursprüngliche Liste ist zu Ende'), false);
+});
+
+test('steps the real player volume and reports the resulting value', async () => {
+  const player = new FakePlayer();
+  const changes = [];
+  const controller = new PlaybackController({
+    player,
+    baseUrl: 'http://127.0.0.1:3210',
+    api: {},
+    hooks: {
+      toast() {}, setEmpty() {}, setPlaylist() {}, setTitle() {}, openMenu() {},
+      setVolume: (volume, muted) => changes.push({ volume, muted }),
+    },
+  });
+
+  controller.load('AAAAAAAAAAA');
+  controller.adjustVolume(-5);
+  assert.deepEqual(player.commands.at(-1), {
+    channel: 'guest-command',
+    payload: { name: 'volume-step', value: -5 },
+  });
+
+  player.emitGuest('volume-change', { volume: 65, muted: false });
+  await settle();
+  assert.deepEqual(changes, [{ volume: 65, muted: false }]);
+});
+
+test('applies the saved caption preference to embed and fallback playback', async () => {
+  const player = new FakePlayer();
+  const controller = new PlaybackController({
+    player,
+    baseUrl: 'http://127.0.0.1:3210',
+    api: {},
+    caption: 'de',
+    hooks: { toast() {}, setEmpty() {}, setPlaylist() {}, setTitle() {}, openMenu() {} },
+  });
+
+  controller.load('AAAAAAAAAAA');
+  player.emitGuest('embed-status', { videoId: 'AAAAAAAAAAA', ready: true, state: 1 });
+  await settle();
+  assert.ok(player.commands.some(({ payload }) => payload.name === 'caption' && payload.value === 'de'));
+
+  controller.setPlayerOption('caption', null);
+  assert.deepEqual(player.commands.at(-1), {
+    channel: 'guest-command',
+    payload: { name: 'caption', value: null },
+  });
 });

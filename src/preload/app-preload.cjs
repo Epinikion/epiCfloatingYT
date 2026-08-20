@@ -11,11 +11,11 @@ function subscribe(channel, callback) {
 
 contextBridge.exposeInMainWorld('floatingApi', {
   getState: () => ipcRenderer.invoke('app:get-state'),
-  resolveStream: (id) => ipcRenderer.invoke('media:resolve-stream', id),
   resolveQueue: (payload) => ipcRenderer.invoke('media:resolve-queue', payload),
   searchVideos: (query) => ipcRenderer.invoke('video:search', query),
   cookieBrowsers: () => ipcRenderer.invoke('settings:cookie-browsers'),
   setCookieBrowser: (browser) => ipcRenderer.invoke('settings:set-cookie-browser', browser),
+  setCaption: (caption) => ipcRenderer.invoke('settings:set-caption', caption),
   togglePin: () => ipcRenderer.send('window:toggle-pin'),
   minimize: () => ipcRenderer.send('window:minimize'),
   close: () => ipcRenderer.send('window:close'),

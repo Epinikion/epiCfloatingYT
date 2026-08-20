@@ -14,6 +14,7 @@ async function main() {
   const clickHelpClose = process.argv.includes('--click-close');
   const searchQuery = process.argv.find((argument) => argument.startsWith('--search='))?.slice(9) || '';
   const playFirstSearchResult = process.argv.includes('--play-first-result');
+  const searchResultIndex = Number(process.argv.find((argument) => argument.startsWith('--result='))?.slice(9));
   const pressSearch = process.argv.includes('--press-search');
   const viewport = /^(\d+)x(\d+)$/.exec(process.argv.find((argument) => argument.startsWith('--viewport='))?.slice(11) || '');
   const targets = await fetch(`http://127.0.0.1:${port}/json/list`).then((response) => response.json());
@@ -50,7 +51,7 @@ async function main() {
   const clickElement = async (selector) => {
     const pointResult = await command('Runtime.evaluate', {
       returnByValue: true,
-      expression: `(() => { const rect=document.querySelector(${JSON.stringify(selector)})?.getBoundingClientRect(); return rect ? {x:rect.x+rect.width/2,y:rect.y+rect.height/2} : null; })()`,
+      expression: `(() => { const element=document.querySelector(${JSON.stringify(selector)});element?.scrollIntoView({block:'center',inline:'center'});const rect=element?.getBoundingClientRect();return rect ? {x:rect.x+rect.width/2,y:rect.y+rect.height/2} : null; })()`,
     });
     const point = pointResult.result.value;
     if (!point) return;
@@ -75,8 +76,9 @@ async function main() {
     });
     await new Promise((resolve) => setTimeout(resolve, 4500));
   }
-  if (playFirstSearchResult) {
-    await clickElement('.search-result');
+  if (playFirstSearchResult || Number.isInteger(searchResultIndex)) {
+    const index = Number.isInteger(searchResultIndex) ? Math.max(0, searchResultIndex) : 0;
+    await clickElement(`.search-result:nth-child(${index + 1})`);
     await new Promise((resolve) => setTimeout(resolve, 1200));
   }
   if (videoId) {
@@ -132,6 +134,11 @@ async function main() {
           feedback: document.querySelector('#search-feedback')?.textContent || '',
           resultCount: document.querySelectorAll('.search-result').length,
           selectedTitle: document.querySelector('.search-result[aria-selected="true"] .search-title')?.textContent || '',
+          results: [...document.querySelectorAll('.search-result')].map((result) => ({
+            id: /\\/vi\\/([A-Za-z0-9_-]{11})\\//.exec(result.querySelector('img')?.src || '')?.[1] || '',
+            title: result.querySelector('.search-title')?.textContent || '',
+            meta: result.querySelector('.search-meta')?.textContent || '',
+          })),
         },
         helpLayout: helpDialog && !document.querySelector('#help-overlay')?.hidden ? {
           activeTab: document.querySelector('[data-help-tab][aria-selected="true"]')?.dataset.helpTab,

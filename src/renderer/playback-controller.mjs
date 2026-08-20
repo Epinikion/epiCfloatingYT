@@ -1,10 +1,9 @@
 import { buildEmbedUrl, buildWatchUrl, isPersonalPlaylist, parseYouTubeInput } from '../shared/youtube-url.mjs';
 
 const BLOCKED_ERRORS = new Set([100, 101, 150, 'timeout']);
-const MAX_SKIPS = 6;
 
 export class PlaybackController {
-  constructor({ player, api, baseUrl, hooks }) {
+  constructor({ player, api, baseUrl, hooks, caption = null }) {
     this.player = player;
     this.api = api;
     this.baseUrl = baseUrl;
@@ -13,10 +12,8 @@ export class PlaybackController {
     this.generation = 0;
     this.pendingInfo = new Map();
     this.requestSequence = 0;
-    this.queueRequest = null;
-    this.streamSource = null;
-    this.blocking = false;
     this.lastBlockedId = '';
+    this.preferredCaption = caption == null ? null : String(caption);
     this.#bindPlayer();
   }
 
@@ -27,10 +24,8 @@ export class PlaybackController {
       return false;
     }
     this.generation += 1;
-    this.blocking = false;
     this.lastBlockedId = '';
-    this.streamSource = null;
-    this.current = { ...parsed, mode: 'embed', queue: Array.isArray(options.queue) ? options.queue : null, skips: 0 };
+    this.current = { ...parsed, mode: 'embed', queue: Array.isArray(options.queue) ? options.queue : null };
     this.hooks.setEmpty(false);
     this.hooks.setPlaylist(Boolean(parsed.list));
     this.hooks.setTitle('');
@@ -56,16 +51,12 @@ export class PlaybackController {
 
   togglePlay() { this.send('toggle'); }
   toggleMute() { this.send('mute-toggle'); }
+  adjustVolume(delta) { this.send('volume-step', Math.max(-100, Math.min(100, Math.round(Number(delta) || 0)))); }
 
   async neighbour(forward) {
     if (!this.current) return false;
-    if (isPersonalPlaylist(this.current.list) || this.current.mode === 'stream') {
+    if (isPersonalPlaylist(this.current.list)) {
       if (this.#stepQueue(forward)) return true;
-      if (this.queueRequest) {
-        this.hooks.toast('Liste wird geholt …');
-        await this.queueRequest;
-        if (this.#stepQueue(forward)) return true;
-      }
       this.hooks.toast('Kein weiteres Video in der Liste');
       return false;
     }
@@ -95,6 +86,7 @@ export class PlaybackController {
   }
 
   setPlayerOption(name, value) {
+    if (name === 'caption') this.preferredCaption = value == null ? null : String(value);
     this.send(name, value);
   }
 
@@ -135,14 +127,8 @@ export class PlaybackController {
       }
       return;
     }
-    if (type === 'guest-ready' && payload.page === 'stream' && this.streamSource) {
-      this.send('load-stream', this.streamSource);
-      return;
-    }
-    if (type === 'stream-state') {
-      if (!this.current || this.current.mode !== 'stream') return;
-      if (payload.error) this.#fallbackToWatch('direktstrom', this.current.id);
-      else if (payload.ended) await this.neighbour(true);
+    if (type === 'volume-change') {
+      this.hooks.setVolume?.(Number(payload.volume), Boolean(payload.muted));
       return;
     }
     if (!this.current) return;
@@ -152,6 +138,7 @@ export class PlaybackController {
 
   async #handleEmbedStatus(status) {
     if (!this.current || this.current.mode !== 'embed') return;
+    this.send('caption', this.preferredCaption);
     if (status.videoId && status.videoId !== this.current.id) {
       this.current.id = status.videoId;
       this.current.start = 0;
@@ -161,7 +148,6 @@ export class PlaybackController {
     if (Array.isArray(status.playlist) && status.playlist.length) this.current.queue = status.playlist;
     if (status.title) this.hooks.setTitle(status.title);
     if ([1, 3].includes(status.state)) {
-      this.current.skips = 0;
       this.lastBlockedId = '';
     }
     if (status.state === 0 && isPersonalPlaylist(this.current.list)) {
@@ -170,13 +156,14 @@ export class PlaybackController {
     }
     if (!BLOCKED_ERRORS.has(status.error) || [1, 3].includes(status.state)) return;
     const failed = /^[A-Za-z0-9_-]{11}$/.test(status.videoId || '') ? status.videoId : this.current.id;
-    if (!failed || this.blocking || failed === this.lastBlockedId) return;
+    if (!failed || failed === this.lastBlockedId) return;
     this.lastBlockedId = failed;
-    await this.#handleBlocked(status.error, failed, this.generation);
+    this.#fallbackToWatch(status.error, failed);
   }
 
   async #handleWatchStatus(status) {
     if (!this.current || this.current.mode !== 'watch') return;
+    this.send('caption', this.preferredCaption);
     const personal = isPersonalPlaylist(this.current.list);
     const youtubeAdvanced = Boolean(status.videoId && status.videoId !== this.current.id);
     if (personal && (status.state === 0 || youtubeAdvanced)) {
@@ -193,45 +180,13 @@ export class PlaybackController {
     if (status.title) this.hooks.setTitle(status.title);
   }
 
-  async #handleBlocked(code, id, generation) {
-    this.blocking = true;
-    if (isPersonalPlaylist(this.current.list)) {
-      this.#fallbackToWatch(code, id);
-      this.blocking = false;
-      return;
-    }
-    this.#ensureQueue();
-    this.hooks.toast(`Video gesperrt (${code}) – hole Direktstrom …`);
-    const source = await this.api.resolveStream(id);
-    if (generation !== this.generation || !this.current) return;
-    if (source?.video && !source.error) {
-      this.current = { ...this.current, id, mode: 'stream' };
-      this.streamSource = { video: source.video, audio: source.audio || null };
-      this.player.src = `${this.baseUrl}/stream.html`;
-      if (source.title) this.hooks.setTitle(source.title);
-      this.hooks.toast(source.height ? `Direktstrom ${source.height}p` : 'Direktstrom');
-      this.blocking = false;
-      return;
-    }
-    const reason = source?.error || 'kein Ergebnis';
-    if (this.current.list && this.current.skips < MAX_SKIPS) {
-      this.current.skips += 1;
-      this.lastBlockedId = '';
-      this.hooks.toast(`${reason} – Titel übersprungen`);
-      this.send('next');
-    } else this.#fallbackToWatch(code, id, reason);
-    this.blocking = false;
-  }
-
   #fallbackToWatch(code, id, reason = '') {
     if (!this.current) return;
     const selected = /^[A-Za-z0-9_-]{11}$/.test(id || '') ? id : this.current.id;
     const start = selected === this.current.id ? this.current.start : 0;
     this.current = { ...this.current, id: selected, start, mode: 'watch' };
-    this.streamSource = null;
     this.player.src = buildWatchUrl(this.current);
-    if (code === 'direktstrom') this.hooks.toast('Direktstrom abgebrochen – lade YouTube-Seite');
-    else if (code === 'timeout') this.hooks.toast('Embed antwortet nicht – lade YouTube-Seite');
+    if (code === 'timeout') this.hooks.toast('Embed antwortet nicht – lade YouTube-Seite');
     else this.hooks.toast(reason ? `${reason} – lade YouTube-Seite` : `Embed gesperrt (${code}) – YouTube-Seite`);
   }
 
@@ -245,17 +200,6 @@ export class PlaybackController {
     const list = this.current.list;
     this.load(buildWatchUrl({ id, list, index: index + 1 }), { queue });
     return true;
-  }
-
-  #ensureQueue() {
-    if (!this.current?.list || this.current.queue?.length || this.queueRequest) return;
-    const generation = this.generation;
-    this.queueRequest = this.api.resolveQueue({ id: this.current.id || '', list: this.current.list, index: this.current.index || 0 })
-      .then((result) => {
-        if (generation === this.generation && Array.isArray(result?.ids) && this.current) this.current.queue = result.ids;
-        return result;
-      })
-      .finally(() => { this.queueRequest = null; });
   }
 
   async #resolvePersonalList(generation) {
@@ -274,8 +218,7 @@ export class PlaybackController {
       if (!id) this.load(buildWatchUrl({ id: result.ids[0], list }), { queue: result.ids });
       return;
     }
-    this.hooks.toast(`${result?.error || 'Liste leer'} – lade YouTube-Seite`);
-    this.#fallbackToWatch('liste', id);
+    this.#fallbackToWatch('liste', id, result?.error || 'Liste leer');
   }
 
   #isAllowedNavigation(rawUrl) {

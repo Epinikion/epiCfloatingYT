@@ -16,6 +16,12 @@ function cookieBrowser(value) {
   return COOKIE_BROWSERS.includes(normalized) ? normalized : '';
 }
 
+function caption(value) {
+  if (value == null || value === '') return null;
+  const normalized = String(value).trim();
+  return /^[A-Za-z0-9_.-]{1,32}$/.test(normalized) ? normalized : null;
+}
+
 function defaultState() {
   return {
     version: STATE_VERSION,
@@ -26,6 +32,7 @@ function defaultState() {
     glow: true,
     sharpen: false,
     cookieBrowser: '',
+    caption: null,
   };
 }
 
@@ -56,6 +63,7 @@ function sanitizeState(raw) {
     glow: oldGlow,
     sharpen: typeof source.sharpen === 'boolean' ? source.sharpen : defaults.sharpen,
     cookieBrowser: cookieBrowser(source.cookieBrowser),
+    caption: caption(source.caption),
   };
 }
 
@@ -106,4 +114,4 @@ class StateStore {
   }
 }
 
-module.exports = { StateStore, STATE_VERSION, COOKIE_BROWSERS, defaultState, sanitizeState, cookieBrowser };
+module.exports = { StateStore, STATE_VERSION, COOKIE_BROWSERS, defaultState, sanitizeState, cookieBrowser, caption };

@@ -103,7 +103,7 @@ function installLocalGestures() {
   document.addEventListener('pointerup', finish, true);
   document.addEventListener('pointercancel', finish, true);
   document.addEventListener('click', (event) => {
-    if (!moved || isControlEvent(event)) return;
+    if (isControlEvent(event)) return;
     moved = false;
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -154,6 +154,10 @@ function playerCommandSource(command) {
       const volume = Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
       return `(() => {const p=${player},v=${video};if(p?.setVolume){p.setVolume(${volume});if(${volume}>0)p.unMute?.();return true}if(v){v.volume=${volume / 100};v.muted=false;return true}return false})()`;
     }
+    case 'volume-step': {
+      const delta = Math.max(-100, Math.min(100, Math.round(Number(value) || 0)));
+      return `(() => {const p=${player},v=${video},d=${delta};if(p?.setVolume){const n=Math.max(0,Math.min(100,Math.round((p.getVolume?.()??100)+d)));p.setVolume(n);if(n>0)p.unMute?.();return{volume:n,muted:p.isMuted?.()??n===0}}if(v){const n=Math.max(0,Math.min(100,Math.round(v.volume*100+d)));v.volume=n/100;if(n>0)v.muted=false;return{volume:n,muted:v.muted}}return null})()`;
+    }
     case 'muted': return `(() => {const p=${player},v=${video};if(p){${value ? 'p.mute?.()' : 'p.unMute?.()'};return true}if(v){v.muted=${Boolean(value)};return true}return false})()`;
     case 'rate': return Number.isFinite(Number(value)) ? `(() => {const p=${player},v=${video};if(p?.setPlaybackRate){p.setPlaybackRate(${Number(value)});return true}if(v){v.playbackRate=${Number(value)};return true}return false})()` : null;
     case 'quality': {
@@ -176,6 +180,7 @@ async function handleYouTubeCommand(command) {
   let result = null;
   try { result = await webFrame.executeJavaScript(source, true); } catch {}
   if (command.name === 'info') send('player-info', { requestId: command.requestId, info: result });
+  else if (command.name === 'volume-step' && result) send('volume-change', result);
 }
 
 function boot() {

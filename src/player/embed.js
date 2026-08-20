@@ -115,13 +115,21 @@ window.floatingHost.onCommand((command) => {
   } else if (command.name === 'volume') {
     player.setVolume?.(Math.max(0, Math.min(100, Number(value) || 0)));
     if (Number(value) > 0) player.unMute?.();
+  } else if (command.name === 'volume-step') {
+    const volume = Math.max(0, Math.min(100, Math.round((player.getVolume?.() ?? 100) + (Number(value) || 0))));
+    player.setVolume?.(volume);
+    if (volume > 0) player.unMute?.();
+    window.floatingHost.emit('volume-change', { volume, muted: player.isMuted?.() ?? volume === 0 });
   } else if (command.name === 'muted') value ? player.mute?.() : player.unMute?.();
   else if (command.name === 'rate') player.setPlaybackRate?.(Number(value));
   else if (command.name === 'quality') {
     player.setPlaybackQualityRange?.(String(value));
     player.setPlaybackQuality?.(String(value));
   } else if (command.name === 'caption') {
-    try { player.setOption?.('captions', 'track', value == null ? {} : { languageCode: String(value) }); } catch {}
+    try {
+      if (!(player.getOptions?.() || []).includes('captions')) player.loadModule?.('captions');
+      player.setOption?.('captions', 'track', value == null ? {} : { languageCode: String(value) });
+    } catch {}
   } else if (command.name === 'info') {
     window.floatingHost.emit('player-info', { requestId: command.requestId, info: playerInfo() });
   }

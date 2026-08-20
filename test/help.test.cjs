@@ -16,6 +16,8 @@ test('exposes a complete shortcut and gesture help from every discoverable entry
   }
   for (const label of [
     'Leertaste', 'Strg', 'Shift', 'F1', 'Wiedergabe / Pause', 'Ton an / aus',
+    'Lautstärke erhöhen / verringern', 'Einfacher Klick', 'Keine Wiedergabeaktion',
+    'Klicks gehen an das Fenster darunter',
     'Vorheriger Titel', 'Nächster Titel', 'Deckkraft erhöhen / verringern',
     'Randlicht an / aus', 'Bildschärfung an / aus', 'Seitenverhältnis fixieren / freigeben',
     'Fenster verschieben', 'Doppelklick', 'Oberkante berühren',
@@ -23,6 +25,11 @@ test('exposes a complete shortcut and gesture help from every discoverable entry
 
   assert.match(renderer, /case 'help': this\.toggleHelp\(\)/);
   assert.match(windowController, /key === 'f1' && fromGuest/);
+  assert.match(windowController, /name: 'volume-step'.*arrowup.*5.*-5/);
+  assert.match(renderer, /adjustVolume\(key === 'arrowup' \? 5 : -5\)/);
+  assert.match(renderer, /setCaption\(item\.value\)/);
+  assert.match(windowController, /setIgnoreMouseEvents\(enabled, \{ forward: true \}\)/);
+  assert.match(windowController, /overWindow && !overVideo/);
   assert.match(styles, /#help-overlay\s*\{[^}]*background:\s*transparent/s);
   assert.match(styles, /#help-overlay\s*\{[^}]*-webkit-app-region:\s*no-drag/s);
   assert.match(styles, /#help-overlay::before\s*\{[^}]*left:\s*var\(--stage-left\)[^}]*width:\s*var\(--stage-width\)/s);

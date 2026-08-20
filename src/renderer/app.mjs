@@ -33,6 +33,7 @@ class FloatingApp {
     this.toolbarTimer = null;
     this.toastTimer = null;
     this.cookieBrowser = '';
+    this.caption = null;
     this.menuMuted = false;
     this.volumeTimer = null;
     this.title = '';
@@ -60,17 +61,23 @@ class FloatingApp {
     this.videoRatio = Number.isFinite(state.window?.aspect) ? state.window.aspect : 16 / 9;
     this.glow = Boolean(state.glow);
     this.cookieBrowser = state.cookieBrowser || '';
+    this.caption = state.caption == null ? null : String(state.caption);
     document.body.classList.toggle('glow', this.glow);
     this.elements.pin.classList.toggle('off', !state.pinned);
     this.playback = new PlaybackController({
       player: this.elements.player,
       api: this.api,
       baseUrl: state.baseUrl,
+      caption: this.caption,
       hooks: {
         toast: (text) => this.toast(text),
         setEmpty: (empty) => this.setEmpty(empty),
         setPlaylist: (visible) => document.body.classList.toggle('has-playlist', visible),
         setTitle: (title) => this.setTitle(title),
+        setVolume: (volume, muted) => {
+          this.#paintVolume(volume, muted);
+          this.toast(`Lautstärke ${Math.max(0, Math.min(100, Math.round(Number(volume) || 0)))} %`);
+        },
         openMenu: () => this.toggleMenu(true),
       },
     });
@@ -151,6 +158,11 @@ class FloatingApp {
       if (!this.elements['help-overlay'].hidden && key === 'escape') { event.preventDefault(); this.toggleHelp(false); }
       else if (key === ' ' || key === 'k') { event.preventDefault(); this.playback?.togglePlay(); }
       else if (key === 'm') this.playback?.toggleMute();
+      else if (!event.shiftKey && ['arrowup', 'arrowdown'].includes(key)
+        && !event.target.closest('input,button,select,[role="slider"],[contenteditable="true"]')) {
+        event.preventDefault();
+        this.playback?.adjustVolume(key === 'arrowup' ? 5 : -5);
+      }
       else if (key === 'escape') this.#hideToolbar();
     });
 
@@ -372,8 +384,9 @@ class FloatingApp {
           else this.toast('Ohne Browser-Cookies');
           return;
         }
+        if (command === 'caption') this.caption = await this.api.setCaption(item.value);
         this.optionWishes.set(id, { value: item.value, until: Date.now() + 8000 });
-        this.playback?.setPlayerOption(command, item.value);
+        this.playback?.setPlayerOption(command, command === 'caption' ? this.caption : item.value);
         setTimeout(() => void this.#refreshMenu(), 500);
         setTimeout(() => void this.#refreshMenu(), 1800);
       });
@@ -426,6 +439,7 @@ class FloatingApp {
         break;
       case 'play-pause': this.playback?.togglePlay(); break;
       case 'mute': this.playback?.toggleMute(); break;
+      case 'volume-step': this.playback?.adjustVolume(message.delta); break;
       case 'next': void this.playback?.neighbour(true); break;
       case 'previous': void this.playback?.neighbour(false); break;
       case 'menu': this.toggleMenu(); break;

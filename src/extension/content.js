@@ -13,6 +13,49 @@
     target.postMessage({ source: SOURCE, type, payload }, '*');
   };
 
+  function installContextMenuBlocker() {
+    document.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }, true);
+  }
+
+  if (youtube) installContextMenuBlocker();
+
+  function formatTime(value) {
+    const seconds = Math.max(0, Math.floor(Number(value) || 0));
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainder = seconds % 60;
+    return hours
+      ? `${hours}:${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`
+      : `${minutes}:${String(remainder).padStart(2, '0')}`;
+  }
+
+  function installTimeDisplay() {
+    const display = document.createElement('div');
+    display.id = '__floating-time-display';
+    display.setAttribute('role', 'timer');
+    display.setAttribute('aria-label', 'Aktuelle Position und Videodauer');
+    document.body.appendChild(display);
+    const update = () => {
+      const video = document.querySelector('video');
+      display.hidden = !video;
+      if (!video) return;
+      const duration = Number(video.duration);
+      const total = Number.isFinite(duration) && duration > 0
+        ? formatTime(duration)
+        : duration === Infinity ? 'LIVE' : '–:––';
+      const text = `${formatTime(video.currentTime)} / ${total}`;
+      if (display.textContent !== text) display.textContent = text;
+    };
+    for (const name of ['loadedmetadata', 'durationchange', 'timeupdate', 'emptied']) {
+      document.addEventListener(name, update, true);
+    }
+    update();
+    setInterval(update, 250);
+  }
+
   function ensureFilters() {
     if (document.getElementById('__floating-sharpen-filters')) return;
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -105,7 +148,7 @@
     document.addEventListener('pointerup', finish, true);
     document.addEventListener('pointercancel', finish, true);
     document.addEventListener('click', (event) => {
-      if (!moved || isControl(event)) return;
+      if (isControl(event)) return;
       moved = false;
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -173,6 +216,7 @@
     if (consentPage) { const timer = setInterval(() => { if (rejectConsent()) clearInterval(timer); }, 350); return; }
     if (!youtube) return;
     installGestures();
+    installTimeDisplay();
     installVideoReporter();
     installControlTimer();
     installWatchReporter();
