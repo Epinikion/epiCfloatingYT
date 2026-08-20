@@ -370,7 +370,10 @@ body.has-queue-list .queue-list-only { display: grid !important; }
 #volume-value { color: #b8b8bd; font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; }
 
 #resize-handles { position: absolute; inset: 0; z-index: 30; pointer-events: none; }
-#resize-handles i { position: absolute; display: none; pointer-events: auto; touch-action: none; }
+/* The welcome screen covers the whole stage as a window-drag region. Without
+   this opt-out the window system consumes the press for dragging and the
+   handles below it never receive a pointerdown. */
+#resize-handles i { position: absolute; display: none; pointer-events: auto; touch-action: none; -webkit-app-region: no-drag; }
 body.glow #resize-handles i { display: block; }
 [data-direction="n"] { left: calc(var(--stage-left) + 12px); top: var(--stage-top); width: calc(var(--stage-width) - 24px); height: 7px; cursor: n-resize; }
 [data-direction="s"] { left: calc(var(--stage-left) + 12px); top: calc(var(--stage-top) + var(--stage-height) - 7px); width: calc(var(--stage-width) - 24px); height: 7px; cursor: s-resize; }

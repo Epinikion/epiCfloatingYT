@@ -56,3 +56,16 @@ test('uses an icon-only red hover treatment for every toolbar action', () => {
   assert.match(hoverRule, /background:\s*transparent/);
   assert.doesNotMatch(styles, /#toolbar #close:hover/);
 });
+
+test('keeps the resize handles out of the window drag region', () => {
+  // The welcome screen spans the whole stage as a drag region, so the handles
+  // must opt out or the window system swallows their pointerdown.
+  const handleRule = styles.match(/#resize-handles i\s*\{[^}]*\}/s)?.[0] || '';
+  assert.match(handleRule, /-webkit-app-region:\s*no-drag/);
+  assert.match(handleRule, /pointer-events:\s*auto/);
+  assert.match(styles, /#welcome\s*\{[^}]*-webkit-app-region:\s*drag/s);
+  // The container spans the whole window; a no-drag opt-out there would punch
+  // a hole through the toolbar and welcome drag regions.
+  const containerRule = styles.match(/#resize-handles\s*\{[^}]*\}/s)?.[0] || '';
+  assert.doesNotMatch(containerRule, /-webkit-app-region/);
+});
