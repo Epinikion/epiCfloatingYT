@@ -6,7 +6,7 @@
   "content_scripts": [
     {
       "matches": ["https://*.youtube.com/*", "https://*.youtube-nocookie.com/*"],
-      "js": ["response-filter-main.js"],
+      "js": ["response-filter-main.js", "audio-boost-main.js", "quality-main.js"],
       "run_at": "document_start",
       "all_frames": true,
       "world": "MAIN"
@@ -20,4 +20,3 @@
     }
   ]
 }
-

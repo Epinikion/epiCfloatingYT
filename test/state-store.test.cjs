@@ -23,18 +23,26 @@ test('migrates the legacy flat state and clamps unsafe values', () => {
   assert.equal(state.opacity, 0.2);
   assert.equal(state.cookieBrowser, 'firefox');
   assert.equal(state.caption, null);
+  assert.equal(state.soundBoost, 1);
 });
 
 test('persists and reloads state from an explicit path', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'floatingyt-state-'));
   const file = path.join(directory, 'state.json');
   const store = new StateStore(file);
-  store.patch((state) => { state.pinned = false; state.window.videoWidth = 777; state.caption = 'de'; });
+  store.patch((state) => { state.pinned = false; state.window.videoWidth = 777; state.caption = 'de'; state.soundBoost = 2; });
   store.flush();
   const reloaded = new StateStore(file);
   assert.equal(reloaded.value.pinned, false);
   assert.equal(reloaded.value.window.videoWidth, 777);
   assert.equal(reloaded.value.caption, 'de');
+  assert.equal(reloaded.value.soundBoost, 2);
+});
+
+test('accepts only the supported sound boost levels', () => {
+  assert.equal(sanitizeState({ soundBoost: 1.5 }).soundBoost, 1.5);
+  assert.equal(sanitizeState({ soundBoost: 3 }).soundBoost, 3);
+  assert.equal(sanitizeState({ soundBoost: 99 }).soundBoost, 1);
 });
 
 test('sanitizes and persists the preferred caption track', () => {

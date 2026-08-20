@@ -1,16 +1,20 @@
 'use strict';
 
 const query = new URLSearchParams(location.search);
+const hostBridge = window.floatingHost || { emit() {}, onCommand() {} };
+const QUALITY_VALUES = new Set(['highres', 'hd2880', 'hd2160', 'hd1440', 'hd1080', 'hd720', 'large', 'medium', 'small', 'tiny']);
+const requestedQuality = query.get('quality') || '';
 const initial = {
   videoId: query.get('v') || '',
   list: query.get('list') || '',
   start: Number.parseInt(query.get('start') || '0', 10) || 0,
+  quality: QUALITY_VALUES.has(requestedQuality) ? requestedQuality : '',
 };
 const status = { ready: false, error: null, state: -1, videoId: initial.videoId, index: -1, playlist: null, title: '' };
 let player = null;
 
 function emitStatus() {
-  window.floatingHost.emit('embed-status', { ...status });
+  hostBridge.emit('embed-status', { ...status });
 }
 
 function synchronize() {
@@ -29,6 +33,19 @@ function fit() {
   player?.setSize?.(window.innerWidth, window.innerHeight);
 }
 
+function applyInitialQuality() {
+  if (!initial.quality || !player) return;
+  player.setPlaybackQualityRange?.(initial.quality);
+  player.setPlaybackQuality?.(initial.quality);
+}
+
+function relayToPlayer(type, payload) {
+  document.querySelector('iframe')?.contentWindow?.postMessage(
+    { source: 'floatingyt-host', type, payload },
+    'https://www.youtube-nocookie.com',
+  );
+}
+
 window.onYouTubeIframeAPIReady = () => {
   const playerVars = {
     autoplay: 1,
@@ -40,6 +57,7 @@ window.onYouTubeIframeAPIReady = () => {
     origin: location.origin,
   };
   if (initial.start) playerVars.start = initial.start;
+  if (initial.quality) playerVars.vq = initial.quality;
   if (initial.list) playerVars.list = initial.list;
   if (initial.list && !initial.videoId) playerVars.listType = 'playlist';
 
@@ -51,8 +69,10 @@ window.onYouTubeIframeAPIReady = () => {
       onReady(event) {
         status.ready = true;
         fit();
+        applyInitialQuality();
         synchronize();
         event.target.playVideo();
+        setTimeout(applyInitialQuality, 0);
       },
       onError(event) {
         synchronize();
@@ -94,12 +114,13 @@ function playerInfo() {
     rates: player.getAvailablePlaybackRates?.() || [],
     volume: player.getVolume?.() ?? 100,
     muted: player.isMuted?.() ?? false,
+    currentTime: player.getCurrentTime?.() ?? 0,
     tracks: tracks.map((track) => ({ code: track.languageCode, name: track.languageName?.name || track.displayName || track.languageCode })),
     track: active?.languageCode || null,
   };
 }
 
-window.floatingHost.onCommand((command) => {
+hostBridge.onCommand((command) => {
   if (!player || !command) return;
   const value = command.value;
   if (command.name === 'toggle') {
@@ -119,7 +140,7 @@ window.floatingHost.onCommand((command) => {
     const volume = Math.max(0, Math.min(100, Math.round((player.getVolume?.() ?? 100) + (Number(value) || 0))));
     player.setVolume?.(volume);
     if (volume > 0) player.unMute?.();
-    window.floatingHost.emit('volume-change', { volume, muted: player.isMuted?.() ?? volume === 0 });
+    hostBridge.emit('volume-change', { volume, muted: player.isMuted?.() ?? volume === 0 });
   } else if (command.name === 'muted') value ? player.mute?.() : player.unMute?.();
   else if (command.name === 'rate') player.setPlaybackRate?.(Number(value));
   else if (command.name === 'quality') {
@@ -130,8 +151,10 @@ window.floatingHost.onCommand((command) => {
       if (!(player.getOptions?.() || []).includes('captions')) player.loadModule?.('captions');
       player.setOption?.('captions', 'track', value == null ? {} : { languageCode: String(value) });
     } catch {}
+  } else if (command.name === 'boost') {
+    relayToPlayer('boost', { gain: Number(value) });
   } else if (command.name === 'info') {
-    window.floatingHost.emit('player-info', { requestId: command.requestId, info: playerInfo() });
+    hostBridge.emit('player-info', { requestId: command.requestId, info: playerInfo() });
   }
 });
 
@@ -139,7 +162,7 @@ window.floatingHost.onCommand((command) => {
 // content extension applies it there without exposing Electron or Node APIs.
 window.addEventListener('message', (event) => {
   if (event.source !== window || event.data?.source !== 'floatingyt-host' || event.data.type !== 'visual') return;
-  document.querySelector('iframe')?.contentWindow?.postMessage(event.data, 'https://www.youtube-nocookie.com');
+  relayToPlayer('visual', event.data.payload || {});
 });
 
 setTimeout(() => {

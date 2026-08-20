@@ -22,6 +22,11 @@ function caption(value) {
   return /^[A-Za-z0-9_.-]{1,32}$/.test(normalized) ? normalized : null;
 }
 
+function soundBoost(value) {
+  const numeric = Number(value);
+  return [1, 1.5, 2, 3].includes(numeric) ? numeric : 1;
+}
+
 function defaultState() {
   return {
     version: STATE_VERSION,
@@ -33,6 +38,7 @@ function defaultState() {
     sharpen: false,
     cookieBrowser: '',
     caption: null,
+    soundBoost: 1,
   };
 }
 
@@ -64,6 +70,7 @@ function sanitizeState(raw) {
     sharpen: typeof source.sharpen === 'boolean' ? source.sharpen : defaults.sharpen,
     cookieBrowser: cookieBrowser(source.cookieBrowser),
     caption: caption(source.caption),
+    soundBoost: soundBoost(source.soundBoost),
   };
 }
 
@@ -114,4 +121,4 @@ class StateStore {
   }
 }
 
-module.exports = { StateStore, STATE_VERSION, COOKIE_BROWSERS, defaultState, sanitizeState, cookieBrowser, caption };
+module.exports = { StateStore, STATE_VERSION, COOKIE_BROWSERS, defaultState, sanitizeState, cookieBrowser, caption, soundBoost };

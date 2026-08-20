@@ -3,8 +3,8 @@
 # FloatingYT
 
 Ein rahmenloser, immer im Vordergrund bleibender YouTube-Player für Windows –
-mit schneller integrierter Videosuche, Ambient Light, eigener kompakter Bedienung,
-Playlist-Unterstützung und mehrstufiger Werbefilterung.
+mit schneller integrierter Videosuche, lokalen Dateien und Ordnern, Ambient Light,
+eigener kompakter Bedienung, Playlist-Unterstützung und mehrstufiger Werbefilterung.
 
 Diese Codebasis ist eine vollständige Neuimplementierung. Sie bildet die
 bewährte Oberfläche der Vorgängerversion nach, trennt aber Fensterverwaltung,
@@ -41,6 +41,7 @@ Die Artefakte heißen `dist/FloatingYT.exe` (portabel) und
 
 - Suchbegriff in das Startfeld eingeben und ein Ergebnis mit Maus oder Pfeiltasten/Enter öffnen.
 - YouTube-Links werden im selben Feld automatisch erkannt und direkt geladen.
+- Eine Videodatei oder einen ganzen Ordner auf das Fenster ziehen, um ihn lokal abzuspielen.
 - Die Leiste am oberen Videorand erscheint beim Darüberfahren.
 - Freie Fläche in Leiste oder Video verschiebt das Fenster.
 - Ein einfacher Klick auf die Videofläche verändert die Wiedergabe nicht.
@@ -60,6 +61,7 @@ Die Artefakte heißen `dist/FloatingYT.exe` (portabel) und
 | `M` | Ton an/aus |
 | `↑` / `↓` | Lautstärke in 5-%-Schritten ändern |
 | `Strg+←` / `Strg+→` | Vorheriges / nächstes Video |
+| `Strg+Umschalt+P` | Playlist anzeigen/schließen |
 | `Strg+P` | Immer im Vordergrund an/aus |
 | `Strg+,` | Einstellungsmenü |
 | `Strg+B` | Ambient Light an/aus |
@@ -71,6 +73,24 @@ Die Artefakte heißen `dist/FloatingYT.exe` (portabel) und
 Fensterposition, Videogröße, Deckkraft und Einstellungen werden gespeichert.
 Ein vorhandener Zustand der bisherigen Electron-Version wird beim ersten Start
 automatisch in das neue Format übernommen.
+
+## Lokale Videos
+
+Einzelne Dateien und Ordner lassen sich per Drag-and-drop auf jede Stelle des
+Fensters ziehen. Ordner werden rekursiv durchsucht; gefundene Videos landen in
+einer natürlich sortierten Warteschlange und spielen automatisch nacheinander.
+Mit `Strg+←` und `Strg+→` kann darin vor- und zurückgesprungen werden. Das
+Playlist-Symbol oder `Strg+Umschalt+P` öffnet die Liste zur direkten Auswahl;
+dieselbe Ansicht steht auch für YouTube-Playlists bereit.
+
+Erkannt werden MP4, M4V, WebM, OGV/OGG, MOV, MKV, AVI und WMV. Welche dieser
+Dateien tatsächlich abspielbar sind, hängt zusätzlich vom enthaltenen Video-
+und Audio-Codec ab; MP4 mit H.264/AAC und WebM sind die zuverlässigsten Formate.
+Nicht unterstützte Dateien zeigen eine verständliche Fehlermeldung im Player.
+
+Die App gibt lokale Dateipfade nicht an die Oberfläche oder an Webseiten weiter.
+Sie überträgt die ausgewählten Videos ausschließlich über zufällige, kurzlebige
+Adressen des internen Players und unterstützt dabei auch bytegenaues Seeking.
 
 ## Gesperrte Videos und persönliche Listen
 
@@ -100,7 +120,7 @@ auch im laufenden Betrieb, Chromium-Browser können ihre Cookie-Datenbank sperre
 | `src/preload/` | kleine, explizite IPC-Brücke für die vertrauenswürdige Oberfläche |
 | `src/guest/` | schmale Electron-Brücke für den jeweiligen Webview-Hauptframe |
 | `src/extension/` | auf YouTube begrenzte Content-Scripts für Unterframes, CSS und Ad-Filter |
-| `src/player/` | lokaler Host für den YouTube-IFrame-API-Player |
+| `src/player/` | lokale Player für YouTube-Embeds und Dateien von der Festplatte |
 | `src/renderer/` | Oberfläche, Playback-Zustandsmaschine und Ambient-Renderer |
 | `src/shared/` | gemeinsam genutztes, getestetes YouTube-Linkmodell |
 | `test/` | URL-, Geometrie-, Zustands-, Medien- und Sicherheitsregressionen |

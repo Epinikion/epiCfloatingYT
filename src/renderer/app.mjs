@@ -11,6 +11,12 @@ const BROWSER_LABELS = {
   '': 'aus', firefox: 'Firefox', chrome: 'Chrome', edge: 'Edge', brave: 'Brave',
   vivaldi: 'Vivaldi', opera: 'Opera', chromium: 'Chromium',
 };
+const BOOST_OPTIONS = [
+  { value: 1, label: 'Aus' },
+  { value: 1.5, label: '150 %' },
+  { value: 2, label: '200 %' },
+  { value: 3, label: '300 %' },
+];
 
 class FloatingApp {
   constructor(api) {
@@ -18,8 +24,9 @@ class FloatingApp {
     this.elements = Object.fromEntries([
       'player', 'stage', 'toolbar', 'url-input', 'pin', 'settings-menu', 'settings', 'toast',
       'video-title', 'ambient', 'resize-snapshot', 'volume', 'volume-value', 'volume-toggle',
-      'help', 'help-overlay', 'help-dialog', 'help-close', 'welcome-help', 'help-from-settings',
-      'search', 'welcome', 'search-results', 'search-feedback', 'search-clear',
+      'help', 'help-overlay', 'help-dialog', 'help-close', 'welcome-help',
+      'search', 'welcome', 'search-results', 'search-feedback', 'search-clear', 'drop-overlay',
+      'playlist', 'playlist-panel', 'playlist-list', 'playlist-count', 'playlist-close',
     ].map((id) => [id, document.getElementById(id)]));
     this.titleText = this.elements['video-title'].querySelector('span');
     this.ambient = new AmbientLight(this.elements.ambient.querySelector('canvas'));
@@ -34,11 +41,16 @@ class FloatingApp {
     this.toastTimer = null;
     this.cookieBrowser = '';
     this.caption = null;
+    this.soundBoost = 1;
     this.menuMuted = false;
     this.volumeTimer = null;
     this.title = '';
     this.optionWishes = new Map();
     this.pendingShortcut = null;
+    this.pendingLocalDrop = null;
+    this.dropLeaveTimer = null;
+    this.playlistItems = [];
+    this.playlistIndex = -1;
     this.searchController = new SearchController({
       api: this.api,
       elements: {
@@ -62,6 +74,7 @@ class FloatingApp {
     this.glow = Boolean(state.glow);
     this.cookieBrowser = state.cookieBrowser || '';
     this.caption = state.caption == null ? null : String(state.caption);
+    this.soundBoost = [1, 1.5, 2, 3].includes(Number(state.soundBoost)) ? Number(state.soundBoost) : 1;
     document.body.classList.toggle('glow', this.glow);
     this.elements.pin.classList.toggle('off', !state.pinned);
     this.playback = new PlaybackController({
@@ -69,15 +82,19 @@ class FloatingApp {
       api: this.api,
       baseUrl: state.baseUrl,
       caption: this.caption,
+      soundBoost: this.soundBoost,
       hooks: {
         toast: (text) => this.toast(text),
         setEmpty: (empty) => this.setEmpty(empty),
         setPlaylist: (visible) => document.body.classList.toggle('has-playlist', visible),
+        setQueue: (queue) => this.#setPlaylistState(queue),
         setTitle: (title) => this.setTitle(title),
         setVolume: (volume, muted) => {
           this.#paintVolume(volume, muted);
           this.toast(`Lautstärke ${Math.max(0, Math.min(100, Math.round(Number(volume) || 0)))} %`);
         },
+        setLocalDrag: (active) => this.#setLocalDrag(active),
+        openLocal: (result) => this.#openLocalResult(result),
         openMenu: () => this.toggleMenu(true),
       },
     });
@@ -85,6 +102,11 @@ class FloatingApp {
       const pending = this.pendingShortcut;
       this.pendingShortcut = null;
       this.#handleShortcut(pending);
+    }
+    if (this.pendingLocalDrop) {
+      const pending = this.pendingLocalDrop;
+      this.pendingLocalDrop = null;
+      this.#openLocalResult(pending);
     }
     this.layout();
     this.setEmpty(true);
@@ -125,6 +147,8 @@ class FloatingApp {
       }
     });
     this.api.onShortcut((message) => this.#handleShortcut(message));
+    this.api.onLocalDrag((active) => this.#setLocalDrag(active));
+    this.api.onLocalDrop((result) => this.#openLocalResult(result));
   }
 
   #bindUi() {
@@ -136,11 +160,12 @@ class FloatingApp {
     this.elements.pin.addEventListener('click', () => this.api.togglePin());
     document.getElementById('previous').addEventListener('click', () => void this.playback?.neighbour(false));
     document.getElementById('next').addEventListener('click', () => void this.playback?.neighbour(true));
+    this.elements.playlist.addEventListener('click', (event) => { event.stopPropagation(); this.togglePlaylist(); });
+    this.elements['playlist-close'].addEventListener('click', () => this.togglePlaylist(false));
     this.elements.search.addEventListener('click', (event) => { event.stopPropagation(); this.toggleSearch(true); });
     this.elements.settings.addEventListener('click', (event) => { event.stopPropagation(); this.toggleMenu(); });
     this.elements.help.addEventListener('click', (event) => { event.stopPropagation(); this.toggleHelp(); });
     this.elements['welcome-help'].addEventListener('click', () => this.toggleHelp(true));
-    this.elements['help-from-settings'].addEventListener('click', () => this.toggleHelp(true));
     this.elements['help-close'].addEventListener('click', () => this.toggleHelp(false));
     this.elements['help-overlay'].addEventListener('click', (event) => { if (event.target === this.elements['help-overlay']) this.toggleHelp(false); });
     for (const tab of document.querySelectorAll('[data-help-tab]')) tab.addEventListener('click', () => this.#selectHelpTab(tab.dataset.helpTab));
@@ -148,6 +173,7 @@ class FloatingApp {
 
     document.addEventListener('mousedown', (event) => {
       if (!this.elements['settings-menu'].hidden && !event.target.closest('#settings-menu') && event.target !== this.elements.settings) this.toggleMenu(false);
+      if (!this.elements['playlist-panel'].hidden && !event.target.closest('#playlist-panel') && !event.target.closest('#playlist')) this.togglePlaylist(false);
     });
     document.addEventListener('keydown', (event) => {
       const key = event.key.toLowerCase();
@@ -220,7 +246,14 @@ class FloatingApp {
       };
       handle.addEventListener('pointerup', finish);
       handle.addEventListener('pointercancel', finish);
-      handle.addEventListener('lostpointercapture', () => { if (active) { active = false; this.api.resizeEnd(); } });
+      handle.addEventListener('lostpointercapture', (event) => {
+        if (!active) return;
+        if (event.buttons & 1) {
+          try { handle.setPointerCapture(event.pointerId); return; } catch {}
+        }
+        active = false;
+        this.api.resizeEnd();
+      });
     }
   }
 
@@ -253,6 +286,11 @@ class FloatingApp {
     menu.style.bottom = `${Math.round(height - top - stageHeight + Math.max(12, stageHeight * 0.08))}px`;
     menu.style.maxWidth = `${Math.max(280, stageWidth - 24)}px`;
     menu.style.maxHeight = `${Math.max(150, stageHeight - 48)}px`;
+    const playlist = this.elements['playlist-panel'];
+    playlist.style.left = `${left + stageWidth - 8}px`;
+    playlist.style.top = `${top + 36}px`;
+    playlist.style.maxWidth = `${Math.max(180, stageWidth - 16)}px`;
+    playlist.style.maxHeight = `${Math.max(110, stageHeight - 48)}px`;
     document.documentElement.style.setProperty('--stage-left', `${left}px`);
     document.documentElement.style.setProperty('--stage-top', `${top}px`);
     document.documentElement.style.setProperty('--stage-width', `${stageWidth}px`);
@@ -300,10 +338,109 @@ class FloatingApp {
     this.toastTimer = setTimeout(() => this.elements.toast.classList.remove('show'), 1800);
   }
 
+  #openLocalResult(result) {
+    clearTimeout(this.dropLeaveTimer);
+    document.body.classList.remove('drop-active');
+    if (!this.playback) { this.pendingLocalDrop = result; return; }
+    if (!Array.isArray(result?.items) || !result.items.length) {
+      this.toast(result?.error || 'Keine unterstützten Videodateien gefunden');
+      return;
+    }
+    this.searchController.reset();
+    this.toggleSearch(false);
+    this.toggleHelp(false);
+    this.toggleMenu(false);
+    if (!this.playback.loadLocal(result.items)) return;
+    const count = result.items.length;
+    this.toast(result.truncated
+      ? `${count} lokale Videos geladen (Liste begrenzt)`
+      : count === 1 ? 'Lokales Video geladen' : `${count} lokale Videos geladen`);
+  }
+
+  #setLocalDrag(active) {
+    clearTimeout(this.dropLeaveTimer);
+    if (active) {
+      document.body.classList.add('drop-active');
+      return;
+    }
+    // Keep the host overlay alive while Chromium hands a native drag from the
+    // webview to the surrounding renderer. It then captures the final drop.
+    this.dropLeaveTimer = setTimeout(() => document.body.classList.remove('drop-active'), 90);
+  }
+
+  #setPlaylistState(queue) {
+    const items = Array.isArray(queue?.items) ? queue.items : [];
+    const mode = queue?.mode === 'youtube' ? 'youtube' : 'local';
+    this.playlistItems = items.map((item) => ({
+      id: String(item?.id || ''),
+      name: String(item?.name || '').trim(),
+      thumbnail: mode === 'youtube' && /^[A-Za-z0-9_-]{11}$/.test(String(item?.id || ''))
+        ? `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`
+        : '',
+      mode,
+    })).filter((item) => item.name);
+    this.playlistIndex = this.playlistItems.length
+      ? Math.max(0, Math.min(this.playlistItems.length - 1, Math.trunc(Number(queue?.index) || 0)))
+      : -1;
+    document.body.classList.toggle('has-queue-list', this.playlistItems.length > 1);
+    this.#renderPlaylist();
+    if (this.playlistItems.length <= 1) this.togglePlaylist(false);
+  }
+
+  #renderPlaylist() {
+    const list = this.elements['playlist-list'];
+    list.textContent = '';
+    this.elements['playlist-count'].textContent = this.playlistItems.length
+      ? `${this.playlistIndex + 1} / ${this.playlistItems.length}`
+      : '';
+    this.playlistItems.forEach((item, index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `playlist-item ${item.mode}`;
+      button.setAttribute('role', 'option');
+      button.setAttribute('aria-selected', String(index === this.playlistIndex));
+      button.title = item.name;
+      const number = document.createElement('span');
+      number.className = 'playlist-index';
+      number.textContent = String(index + 1).padStart(2, '0');
+      const name = document.createElement('span');
+      name.className = 'playlist-name';
+      name.textContent = item.name;
+      button.append(number);
+      if (item.thumbnail) {
+        const thumbnail = document.createElement('img');
+        thumbnail.className = 'playlist-thumbnail';
+        thumbnail.src = item.thumbnail;
+        thumbnail.alt = '';
+        thumbnail.loading = 'lazy';
+        button.append(thumbnail);
+      }
+      button.append(name);
+      button.addEventListener('click', () => {
+        if (this.playback?.selectQueue(index)) this.togglePlaylist(false);
+      });
+      list.append(button);
+    });
+  }
+
+  togglePlaylist(force) {
+    const panel = this.elements['playlist-panel'];
+    const show = this.playlistItems.length > 1 && (force === undefined ? panel.hidden : Boolean(force));
+    if (show) {
+      this.toggleMenu(false);
+      this.toggleHelp(false);
+      this.toggleSearch(false);
+      panel.hidden = false;
+      requestAnimationFrame(() => panel.querySelector('.playlist-item[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }));
+    } else panel.hidden = true;
+    this.elements.playlist.classList.toggle('active', show);
+    this.elements.playlist.setAttribute('aria-expanded', String(show));
+  }
+
   toggleMenu(force) {
     const menu = this.elements['settings-menu'];
     const show = force === undefined ? menu.hidden : Boolean(force);
-    if (show) { this.toggleHelp(false); this.toggleSearch(false); }
+    if (show) { this.toggleHelp(false); this.toggleSearch(false); this.togglePlaylist(false); }
     menu.hidden = !show;
     if (show) void this.#refreshMenu();
   }
@@ -313,6 +450,7 @@ class FloatingApp {
     const show = force === undefined ? overlay.hidden : Boolean(force);
     if (show) {
       this.elements['settings-menu'].hidden = true;
+      this.togglePlaylist(false);
       overlay.hidden = false;
       this.#selectHelpTab('playback');
       this.elements['help-close'].focus();
@@ -328,6 +466,7 @@ class FloatingApp {
     if (show) {
       this.toggleMenu(false);
       this.toggleHelp(false);
+      this.togglePlaylist(false);
       this.searchController.open(initialValue);
       this.#showToolbar();
     } else if (this.searchController.isOpen()) this.searchController.close();
@@ -353,6 +492,7 @@ class FloatingApp {
       this.#paintVolume(0, false, false);
       for (const id of ['quality-options', 'rate-options', 'caption-options']) this.#fillOptions(id, [], null, '');
     }
+    this.#fillOptions('boost-options', BOOST_OPTIONS, this.soundBoost, 'boost');
     const cookieItems = browsers.map((browser) => ({ value: browser, label: BROWSER_LABELS[browser] || browser }));
     this.#fillOptions('cookie-options', cookieItems, this.cookieBrowser, 'cookie');
   }
@@ -384,9 +524,16 @@ class FloatingApp {
           else this.toast('Ohne Browser-Cookies');
           return;
         }
-        if (command === 'caption') this.caption = await this.api.setCaption(item.value);
-        this.optionWishes.set(id, { value: item.value, until: Date.now() + 8000 });
-        this.playback?.setPlayerOption(command, command === 'caption' ? this.caption : item.value);
+        let selectedValue = item.value;
+        if (command === 'caption') {
+          this.caption = await this.api.setCaption(item.value);
+          selectedValue = this.caption;
+        } else if (command === 'boost') {
+          this.soundBoost = await this.api.setSoundBoost(item.value);
+          selectedValue = this.soundBoost;
+        }
+        this.optionWishes.set(id, { value: selectedValue, until: Date.now() + 8000 });
+        this.playback?.setPlayerOption(command, selectedValue);
         setTimeout(() => void this.#refreshMenu(), 500);
         setTimeout(() => void this.#refreshMenu(), 1800);
       });
@@ -443,11 +590,16 @@ class FloatingApp {
       case 'next': void this.playback?.neighbour(true); break;
       case 'previous': void this.playback?.neighbour(false); break;
       case 'menu': this.toggleMenu(); break;
+      case 'playlist':
+        if (this.playlistItems.length > 1) this.togglePlaylist();
+        else this.toast('Keine Playlist geladen');
+        break;
       case 'search': this.toggleSearch(true); break;
       case 'help': this.toggleHelp(); break;
       case 'escape':
         if (!this.elements['help-overlay'].hidden) this.toggleHelp(false);
         else if (!this.elements['settings-menu'].hidden) this.toggleMenu(false);
+        else if (!this.elements['playlist-panel'].hidden) this.togglePlaylist(false);
         else if (this.searchController.isOpen()) this.toggleSearch(false);
         else this.#hideToolbar();
         break;

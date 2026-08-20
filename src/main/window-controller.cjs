@@ -31,6 +31,10 @@ function isAllowedGuestUrl(rawUrl, localOrigin) {
   }
 }
 
+function shouldPassMouseThrough({ glow, fullscreen, resizing, dragging, overWindow, overVideo }) {
+  return Boolean(glow && !fullscreen && !resizing && !dragging && overWindow && !overVideo);
+}
+
 class WindowController {
   constructor({ BrowserWindow, screen, clipboard, store, appPreload, guestPreload, icon, uiFile, partition, baseUrl }) {
     this.BrowserWindow = BrowserWindow;
@@ -140,6 +144,7 @@ class WindowController {
       return true;
     }
     if (control && ['f', 'l'].includes(key)) { this.send('app:shortcut', { name: 'search' }); return true; }
+    if (control && input.shift && key === 'p') { this.send('app:shortcut', { name: 'playlist' }); return true; }
     if (control && key === 'p') { this.togglePin(); return true; }
     if (control && key === 'w') { this.window.close(); return true; }
     if (control && ['arrowleft', 'arrowright'].includes(key)) {
@@ -276,6 +281,9 @@ class WindowController {
   startResize({ direction, x, y }) {
     if (!this.window || !this.store.value.glow || this.fullscreen) return;
     if (!/^(n|s|e|w|ne|nw|se|sw)$/.test(direction) || !Number.isFinite(x) || !Number.isFinite(y)) return;
+    // The pointer necessarily crosses the transparent ambient margin while an
+    // edge moves. Mouse pass-through would cancel Chromium's pointer capture.
+    this.#setMousePassthrough(false);
     this.resize = { direction, x, y, bounds: this.window.getBounds() };
     this.#beginVisualResize();
   }
@@ -399,7 +407,14 @@ class WindowController {
         && pointer.y >= bounds.y && pointer.y < bounds.y + bounds.height;
       const overVideo = pointer.x >= video.x && pointer.x < video.x + video.width
         && pointer.y >= video.y && pointer.y < video.y + video.height;
-      this.#setMousePassthrough(Boolean(this.store.value.glow && !this.fullscreen && overWindow && !overVideo));
+      this.#setMousePassthrough(shouldPassMouseThrough({
+        glow: this.store.value.glow,
+        fullscreen: this.fullscreen,
+        resizing: Boolean(this.resize),
+        dragging: Boolean(this.drag),
+        overWindow,
+        overVideo,
+      }));
       const near = pointer.x >= video.x && pointer.x < video.x + video.width && pointer.y >= video.y && pointer.y < video.y + HOVER_HEIGHT;
       if (near !== previous) {
         previous = near;
@@ -438,4 +453,4 @@ class WindowController {
   }
 }
 
-module.exports = { WindowController, isAllowedGuestUrl };
+module.exports = { WindowController, isAllowedGuestUrl, shouldPassMouseThrough };

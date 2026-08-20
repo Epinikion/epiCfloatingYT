@@ -1,6 +1,6 @@
 'use strict';
 
-const { contextBridge, ipcRenderer, webFrame } = require('electron');
+const { contextBridge, ipcRenderer, webFrame, webUtils } = require('electron');
 
 const isTop = window.top === window;
 const isLocal = location.hostname === '127.0.0.1';
@@ -11,9 +11,48 @@ const HOST_SOURCE = 'floatingyt-host';
 const FORWARDED_EVENTS = new Set([
   'video-metadata', 'drag-start', 'drag-move', 'drag-end',
   'fullscreen-toggle', 'fullscreen-leave', 'watch-status',
+  'boost-status', 'quality-status',
 ]);
 const ASPECT_EPSILON = 0.0005;
 const NEAR_FIT_MAX_GAP = 3;
+
+function hasDroppedFiles(event) {
+  return [...(event.dataTransfer?.types || [])].includes('Files');
+}
+
+function installDropBridge() {
+  let dragDepth = 0;
+  window.addEventListener('dragenter', (event) => {
+    if (!hasDroppedFiles(event)) return;
+    event.preventDefault();
+    dragDepth += 1;
+    send('local-drag', { active: true });
+  }, true);
+  window.addEventListener('dragover', (event) => {
+    if (!hasDroppedFiles(event)) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+    send('local-drag', { active: true });
+  }, true);
+  window.addEventListener('dragleave', (event) => {
+    if (!dragDepth) return;
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (!dragDepth) send('local-drag', { active: false });
+  }, true);
+  window.addEventListener('dragend', () => { dragDepth = 0; send('local-drag', { active: false }); }, true);
+  window.addEventListener('drop', async (event) => {
+    if (!hasDroppedFiles(event)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    dragDepth = 0;
+    send('local-drag', { active: false });
+    const paths = [...event.dataTransfer.files]
+      .map((file) => { try { return webUtils.getPathForFile(file); } catch { return ''; } })
+      .filter(Boolean);
+    const result = await ipcRenderer.invoke('local-media:open', paths);
+    send('local-drop-result', result || {});
+  }, true);
+}
 
 if (isLocal && isTop) {
   contextBridge.exposeInMainWorld('floatingHost', {
@@ -160,16 +199,20 @@ function playerCommandSource(command) {
     }
     case 'muted': return `(() => {const p=${player},v=${video};if(p){${value ? 'p.mute?.()' : 'p.unMute?.()'};return true}if(v){v.muted=${Boolean(value)};return true}return false})()`;
     case 'rate': return Number.isFinite(Number(value)) ? `(() => {const p=${player},v=${video};if(p?.setPlaybackRate){p.setPlaybackRate(${Number(value)});return true}if(v){v.playbackRate=${Number(value)};return true}return false})()` : null;
+    case 'boost': {
+      const gain = [1, 1.5, 2, 3].includes(Number(value)) ? Number(value) : 1;
+      return `(() => {window.postMessage({source:'floatingyt-host',type:'boost',payload:{gain:${gain}}},location.origin);return true})()`;
+    }
     case 'quality': {
       const allowed = ['highres', 'hd2880', 'hd2160', 'hd1440', 'hd1080', 'hd720', 'large', 'medium', 'small', 'tiny', 'auto'];
       if (!allowed.includes(value)) return null;
-      return `(() => {const p=${player};if(!p)return false;p.setPlaybackQualityRange?.(${JSON.stringify(value)});p.setPlaybackQuality?.(${JSON.stringify(value)});return true})()`;
+      return `(() => {window.postMessage({source:'floatingyt-host',type:'quality',payload:{value:${JSON.stringify(value)}}},location.origin);return true})()`;
     }
     case 'caption': {
       const track = value == null ? '{}' : `{languageCode:${JSON.stringify(String(value))}}`;
       return `(() => {const p=${player};if(!p)return false;try{if(!(p.getOptions?.()||[]).includes('captions'))p.loadModule?.('captions');p.setOption?.('captions','track',${track});return true}catch{return false}})()`;
     }
-    case 'info': return `(() => {const p=${player},v=${video};if(!p)return v?{volume:Math.round(v.volume*100),muted:v.muted,quality:null,qualities:[],rate:v.playbackRate,rates:[.25,.5,.75,1,1.25,1.5,1.75,2],tracks:[],track:null}:null;let tracks=[],active=null;try{if(!(p.getOptions?.()||[]).includes('captions'))p.loadModule?.('captions');tracks=p.getOption?.('captions','tracklist')||[];active=p.getOption?.('captions','track')}catch{}return{quality:p.getPlaybackQuality?.(),qualities:p.getAvailableQualityLevels?.()||[],rate:p.getPlaybackRate?.()||1,rates:p.getAvailablePlaybackRates?.()||[],volume:p.getVolume?.()??100,muted:p.isMuted?.()??false,tracks:tracks.map(t=>({code:t.languageCode,name:t.languageName?.name||t.displayName||t.languageCode})),track:active?.languageCode||null}})()`;
+    case 'info': return `(() => {const p=${player},v=${video};if(!p)return v?{volume:Math.round(v.volume*100),muted:v.muted,quality:null,qualities:[],rate:v.playbackRate,rates:[.25,.5,.75,1,1.25,1.5,1.75,2],tracks:[],track:null,currentTime:v.currentTime||0}:null;let tracks=[],active=null;try{if(!(p.getOptions?.()||[]).includes('captions'))p.loadModule?.('captions');tracks=p.getOption?.('captions','tracklist')||[];active=p.getOption?.('captions','track')}catch{}return{quality:p.getPlaybackQuality?.(),qualities:p.getAvailableQualityLevels?.()||[],rate:p.getPlaybackRate?.()||1,rates:p.getAvailablePlaybackRates?.()||[],volume:p.getVolume?.()??100,muted:p.isMuted?.()??false,currentTime:p.getCurrentTime?.()??v?.currentTime??0,tracks:tracks.map(t=>({code:t.languageCode,name:t.languageName?.name||t.displayName||t.languageCode})),track:active?.languageCode||null}})()`;
     default: return null;
   }
 }
@@ -184,6 +227,7 @@ async function handleYouTubeCommand(command) {
 }
 
 function boot() {
+  if (isTop) installDropBridge();
   if (isLocal) {
     ensureLocalFilters();
     installLocalGestures();

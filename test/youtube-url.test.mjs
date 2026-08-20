@@ -36,8 +36,15 @@ test('builds mode-specific URLs and keeps personal queues out of embeds', () => 
     'http://127.0.0.1:1234/embed.html?v=dQw4w9WgXcQ&start=12',
   );
   assert.equal(
+    buildEmbedUrl('http://127.0.0.1:1234', { id: 'dQw4w9WgXcQ', start: 12, quality: 'hd1440' }),
+    'http://127.0.0.1:1234/embed.html?v=dQw4w9WgXcQ&start=12&quality=hd1440',
+  );
+  assert.equal(
+    buildEmbedUrl('http://127.0.0.1:1234', { id: 'dQw4w9WgXcQ', quality: 'invalid' }),
+    'http://127.0.0.1:1234/embed.html?v=dQw4w9WgXcQ',
+  );
+  assert.equal(
     buildWatchUrl({ id: 'dQw4w9WgXcQ', list: 'PLabc', index: 3, start: 12 }),
     'https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLabc&index=3&t=12',
   );
 });
-

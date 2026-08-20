@@ -4,6 +4,8 @@
   window.__floatingYtContent = true;
   const SOURCE = 'floatingyt-extension';
   const HOST_SOURCE = 'floatingyt-host';
+  const AUDIO_SOURCE = 'floatingyt-audio';
+  const QUALITY_SOURCE = 'floatingyt-quality';
   const ASPECT_EPSILON = 0.0005;
   const NEAR_FIT_MAX_GAP = 3;
   const youtube = /(^|\.)(youtube\.com|youtube-nocookie\.com)$/i.test(location.hostname);
@@ -21,6 +23,12 @@
   }
 
   if (youtube) installContextMenuBlocker();
+
+  window.addEventListener('message', (event) => {
+    if (event.source !== window) return;
+    if (event.data?.source === AUDIO_SOURCE && event.data.type === 'boost-status') emit('boost-status', event.data.payload || {});
+    else if (event.data?.source === QUALITY_SOURCE && event.data.type === 'quality-status') emit('quality-status', event.data.payload || {});
+  });
 
   function formatTime(value) {
     const seconds = Math.max(0, Math.floor(Number(value) || 0));

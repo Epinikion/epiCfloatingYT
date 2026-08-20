@@ -4,8 +4,10 @@ const path = require('node:path');
 const { app, BrowserWindow, clipboard, ipcMain, screen, session } = require('electron');
 const { attachAdBlocker } = require('./adblock.cjs');
 const { LocalPlayerServer } = require('./local-server.cjs');
+const { collectMediaFiles } = require('./local-media.cjs');
 const { MediaResolver } = require('./media-resolver.cjs');
-const { COOKIE_BROWSERS, StateStore, caption, cookieBrowser } = require('./state-store.cjs');
+const { COOKIE_BROWSERS, StateStore, caption, cookieBrowser, soundBoost } = require('./state-store.cjs');
+const { VideoMetadataService } = require('./video-metadata.cjs');
 const { VideoSearchService } = require('./video-search.cjs');
 const { WindowController } = require('./window-controller.cjs');
 
@@ -42,7 +44,7 @@ function findStartUrl(argv) {
   return argv.slice(1).find((argument) => /^(https?:\/\/)?([\w-]+\.)*(youtube\.com|youtube-nocookie\.com|youtu\.be)\//i.test(argument)) || null;
 }
 
-function registerIpc({ resolver, search }) {
+function registerIpc({ resolver, search, metadata }) {
   ipcMain.handle('app:get-state', () => ({
     ...store.value,
     baseUrl: playerServer.baseUrl,
@@ -56,6 +58,13 @@ function registerIpc({ resolver, search }) {
     return resolver.resolveQueue({ id, list, index });
   });
   ipcMain.handle('video:search', (_event, query) => search.search(String(query || '')));
+  ipcMain.handle('video:metadata', (_event, ids) => metadata.resolve(ids));
+  ipcMain.handle('local-media:open', async (_event, inputPaths) => {
+    const { files, truncated } = await collectMediaFiles(inputPaths);
+    if (!files.length) return { items: [], error: 'Keine unterstützten Videodateien gefunden' };
+    const items = playerServer.registerMedia(files);
+    return { items, truncated, error: null };
+  });
   ipcMain.handle('settings:cookie-browsers', () => COOKIE_BROWSERS);
   ipcMain.handle('settings:set-cookie-browser', (_event, value) => {
     store.patch((state) => { state.cookieBrowser = cookieBrowser(value); });
@@ -64,6 +73,10 @@ function registerIpc({ resolver, search }) {
   ipcMain.handle('settings:set-caption', (_event, value) => {
     store.patch((state) => { state.caption = caption(value); });
     return store.value.caption;
+  });
+  ipcMain.handle('settings:set-sound-boost', (_event, value) => {
+    store.patch((state) => { state.soundBoost = soundBoost(value); });
+    return store.value.soundBoost;
   });
 
   ipcMain.on('window:toggle-pin', () => controller?.togglePin());
@@ -99,7 +112,8 @@ if (!app.requestSingleInstanceLock()) {
     await playerServer.start();
     const youtubeSession = await configureYouTubeSession();
     const search = new VideoSearchService({ fetchImpl: youtubeSession.fetch.bind(youtubeSession) });
-    registerIpc({ resolver, search });
+    const metadata = new VideoMetadataService({ fetchImpl: youtubeSession.fetch.bind(youtubeSession) });
+    registerIpc({ resolver, search, metadata });
     controller = new WindowController({
       BrowserWindow,
       screen,

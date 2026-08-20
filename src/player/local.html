@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FloatingYT Local Player</title>
+    <link rel="stylesheet" href="local.css" />
+  </head>
+  <body>
+    <video id="video" autoplay playsinline preload="auto"></video>
+    <button id="play" type="button" aria-label="Wiedergabe pausieren">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <path class="play-icon" d="M17 11l22 13-22 13z" />
+        <path class="pause-icon" d="M14 10h8v28h-8zM27 10h8v28h-8z" />
+      </svg>
+    </button>
+    <output id="time" role="timer" aria-label="Aktuelle Position und Videodauer">0:00 / –:––</output>
+    <input id="timeline" type="range" min="0" max="1000" value="0" step="1" aria-label="Wiedergabefortschritt" />
+    <div id="error" role="alert" hidden></div>
+    <script src="local.js"></script>
+  </body>
+</html>

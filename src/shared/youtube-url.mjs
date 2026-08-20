@@ -65,13 +65,15 @@ export function buildWatchUrl({ id, list, index = 0, start = 0 }) {
   return `https://www.youtube.com/watch?${query}`;
 }
 
-export function buildEmbedUrl(baseUrl, { id, list, start = 0 }) {
+export function buildEmbedUrl(baseUrl, { id, list, start = 0, quality = null }) {
   const query = new URLSearchParams();
   if (id) query.set('v', id);
   if (list && !isPersonalPlaylist(list)) query.set('list', list);
   if (start) query.set('start', String(start));
+  if (['highres', 'hd2880', 'hd2160', 'hd1440', 'hd1080', 'hd720', 'large', 'medium', 'small', 'tiny'].includes(quality)) {
+    query.set('quality', quality);
+  }
   return `${String(baseUrl).replace(/\/$/, '')}/embed.html?${query}`;
 }
 
 export const validation = Object.freeze({ VIDEO_ID, LIST_ID });
-
