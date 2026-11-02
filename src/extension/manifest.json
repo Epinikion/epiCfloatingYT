@@ -20,6 +20,13 @@
     },
     {
       "matches": ["https://player.twitch.tv/*"],
+      "js": ["audio-boost-main.js"],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://player.twitch.tv/*"],
       "js": ["content.js"],
       "run_at": "document_start",
       "all_frames": true

@@ -41,9 +41,10 @@ test('serves the Twitch player locally with the app controls and window gestures
   assert.match(server, /TWITCH_ORIGINS = 'https:\/\/player\.twitch\.tv'/);
   assert.match(read('src/player/twitch.html'), /src="https:\/\/player\.twitch\.tv\/js\/embed\/v1\.js"/);
   assert.match(player, /parent: \[location\.hostname\]/);
-  for (const name of ['toggle', 'mute-toggle', 'volume-step', 'seek', 'quality', 'info']) assert.match(player, new RegExp(`command\.name === '${name}'`));
+  for (const name of ['boost', 'toggle', 'mute-toggle', 'volume-step', 'seek', 'quality', 'info']) assert.match(player, new RegExp(`command\.name === '${name}'`));
   assert.match(preload, /host === 'player\.twitch\.tv'/);
   assert.match(preload, /'twitch-title'/);
   assert.match(content, /if \(twitch\) \{\s*installGestures\(\);/);
   assert.ok(manifest.content_scripts.some(({ matches, js, world }) => matches.includes('https://player.twitch.tv/*') && js.includes('content.js') && !world));
+  assert.ok(manifest.content_scripts.some(({ matches, js, world }) => matches.includes('https://player.twitch.tv/*') && js.includes('audio-boost-main.js') && world === 'MAIN'));
 });

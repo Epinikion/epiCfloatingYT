@@ -46,6 +46,15 @@ function boot() {
   player.addEventListener(Twitch.Player.ONLINE, state(status.state, { error: null }));
 }
 
+// The extension's boost script runs inside the cross-origin Twitch frame and
+// accepts this message only from its local parent page.
+function relayBoost(gain) {
+  document.querySelector('#player iframe')?.contentWindow?.postMessage(
+    { source: 'floatingyt-host', type: 'boost', payload: { gain } },
+    'https://player.twitch.tv',
+  );
+}
+
 function qualities() {
   try {
     return (player.getQualities?.() || []).filter((quality) => quality?.group && quality?.name);
@@ -61,7 +70,8 @@ function volumePercent() {
 hostBridge.onCommand((command) => {
   if (!player || !command) return;
   const value = command.value;
-  if (command.name === 'toggle') player.isPaused?.() ? player.play() : player.pause();
+  if (command.name === 'boost') relayBoost(Number(value));
+  else if (command.name === 'toggle') player.isPaused?.() ? player.play() : player.pause();
   else if (command.name === 'mute-toggle') player.setMuted?.(!player.getMuted?.());
   else if (command.name === 'muted') player.setMuted?.(Boolean(value));
   else if (command.name === 'volume') {

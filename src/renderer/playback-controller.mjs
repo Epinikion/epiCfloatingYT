@@ -284,10 +284,8 @@ export class PlaybackController {
 
   #handleTwitchStatus(status) {
     if (this.current?.mode !== 'twitch') return;
-    if (status.ready && this.soundBoost > 1 && this.boostWarningId !== this.current.id) {
-      this.boostWarningId = this.current.id;
-      this.hooks.toast('Soundboost ist für diese Medienquelle nicht verfügbar');
-    }
+    // The Twitch video element only exists once playback has started.
+    if (status.state === 1) this.send('boost', this.soundBoost);
     if (!status.error || status.error === this.current.error) return;
     this.current.error = status.error;
     if (status.error === 'offline') this.hooks.toast(`${this.current.channel || 'Der Kanal'} ist gerade offline`);

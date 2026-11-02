@@ -372,6 +372,7 @@ test('plays Twitch VODs and channels in the local Twitch player', async () => {
     player,
     baseUrl: 'http://127.0.0.1:3210',
     api: {},
+    soundBoost: 2,
     hooks: { toast: (message) => toasts.push(message), setEmpty() {}, setPlaylist() {}, setQueue() {}, setTitle: (title) => titles.push(title), openMenu() {} },
   });
 
@@ -381,6 +382,10 @@ test('plays Twitch VODs and channels in the local Twitch player', async () => {
   player.emitGuest('twitch-title', { title: 'Deadly Days Roadtrip' });
   await settle();
   assert.deepEqual(titles, ['Twitch-Video', 'Deadly Days Roadtrip']);
+  player.emitGuest('twitch-status', { ready: true, state: 1 });
+  await settle();
+  assert.deepEqual(player.commands.at(-1), { channel: 'guest-command', payload: { name: 'boost', value: 2 } });
+  assert.equal(toasts.length, 0);
 
   controller.setPlayerOption('quality', '720p60');
   assert.deepEqual(player.commands.at(-1), { channel: 'guest-command', payload: { name: 'quality', value: '720p60' } });
