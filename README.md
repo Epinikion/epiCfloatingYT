@@ -1,4 +1,4 @@
-<img src="build/icon.png" width="96" align="left" alt="FloatingYT" />
+<img src="docs/icon.png" width="96" align="left" alt="FloatingYT" />
 
 # FloatingYT
 
