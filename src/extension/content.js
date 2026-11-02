@@ -9,6 +9,7 @@
   const ASPECT_EPSILON = 0.0005;
   const NEAR_FIT_MAX_GAP = 3;
   const youtube = /(^|\.)(youtube\.com|youtube-nocookie\.com)$/i.test(location.hostname);
+  const twitch = /^player\.twitch\.tv$/i.test(location.hostname);
   const consentPage = /^consent\.google\./i.test(location.hostname);
   const emit = (type, payload = {}) => {
     const target = window.top === window ? window : window.parent;
@@ -22,7 +23,7 @@
     }, true);
   }
 
-  if (youtube) installContextMenuBlocker();
+  if (youtube || twitch) installContextMenuBlocker();
 
   window.addEventListener('message', (event) => {
     if (event.source !== window) return;
@@ -125,6 +126,7 @@
     return event.composedPath().some((node) => node instanceof Element && node.matches([
       'button','a','input','select','[role="button"]','[role="slider"]','[contenteditable="true"]',
       '.ytp-chrome-controls','.ytp-progress-bar-container','.player-controls-bottom','player-middle-controls','yt-progress-bar','.ytp-popup',
+      '[data-a-target="player-controls"]','[data-a-target="player-seekbar"]','[role="menu"]','[role="menuitem"]','[role="menuitemradio"]',
     ].join(',')));
   }
   function installGestures() {
@@ -219,8 +221,25 @@
     }, 750);
   }
 
+  // The Twitch embed has no title API, so read the one its overlay shows.
+  function installTwitchTitleReporter() {
+    let last = '';
+    setInterval(() => {
+      const text = (selector) => document.querySelector(selector)?.textContent?.replace(/\s+/g, ' ').trim() || '';
+      const title = [text('[data-a-target="player-info-title"]'), text('[data-test-selector="stream-info-card-component__subtitle"]')]
+        .filter(Boolean).join(' · ');
+      if (title && title !== last) { last = title; emit('twitch-title', { title }); }
+    }, 1000);
+  }
+
   function boot() {
     ensureFilters();
+    if (twitch) {
+      installGestures();
+      installVideoReporter();
+      installTwitchTitleReporter();
+      return;
+    }
     if (consentPage) { const timer = setInterval(() => { if (rejectConsent()) clearInterval(timer); }, 350); return; }
     if (!youtube) return;
     installGestures();

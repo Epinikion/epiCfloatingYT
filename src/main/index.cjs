@@ -41,7 +41,7 @@ async function configureYouTubeSession() {
 }
 
 function findStartUrl(argv) {
-  return argv.slice(1).find((argument) => /^(https?:\/\/)?([\w-]+\.)*(youtube\.com|youtube-nocookie\.com|youtu\.be)\//i.test(argument)) || null;
+  return argv.slice(1).find((argument) => /^(https?:\/\/)?([\w-]+\.)*(youtube\.com|youtube-nocookie\.com|youtu\.be|twitch\.tv)\//i.test(argument)) || null;
 }
 
 function registerIpc({ resolver, search, metadata }) {

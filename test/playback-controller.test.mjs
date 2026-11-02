@@ -363,3 +363,36 @@ test('seeks the active player by ten seconds and confirms the new position', asy
   await settle();
   assert.deepEqual(toasts.slice(-2), ['−10 s · 1:12 / 4:05', '+10 s · 1:02:05']);
 });
+
+test('plays Twitch VODs and channels in the local Twitch player', async () => {
+  const player = new FakePlayer();
+  const toasts = [];
+  const titles = [];
+  const controller = new PlaybackController({
+    player,
+    baseUrl: 'http://127.0.0.1:3210',
+    api: {},
+    hooks: { toast: (message) => toasts.push(message), setEmpty() {}, setPlaylist() {}, setQueue() {}, setTitle: (title) => titles.push(title), openMenu() {} },
+  });
+
+  assert.equal(controller.load('https://www.twitch.tv/videos/2913876098?t=90s'), true);
+  assert.equal(player.src, 'http://127.0.0.1:3210/twitch.html?video=2913876098&start=90');
+  assert.equal(controller.current.mode, 'twitch');
+  player.emitGuest('twitch-title', { title: 'Deadly Days Roadtrip' });
+  await settle();
+  assert.deepEqual(titles, ['Twitch-Video', 'Deadly Days Roadtrip']);
+
+  controller.setPlayerOption('quality', '720p60');
+  assert.deepEqual(player.commands.at(-1), { channel: 'guest-command', payload: { name: 'quality', value: '720p60' } });
+  assert.equal(await controller.neighbour(true), false);
+
+  controller.load('https://www.twitch.tv/handofblood');
+  assert.equal(player.src, 'http://127.0.0.1:3210/twitch.html?channel=handofblood');
+  player.emitGuest('twitch-status', { ready: true, error: 'offline' });
+  player.emitGuest('twitch-status', { ready: true, error: 'offline', state: 2 });
+  await settle();
+  assert.equal(toasts.filter((text) => text === 'handofblood ist gerade offline').length, 1);
+
+  assert.equal(controller.load('https://clips.twitch.tv/FunnyClip-abc_123'), false);
+  assert.equal(toasts.at(-1), 'Twitch-Clips werden noch nicht unterstützt');
+});

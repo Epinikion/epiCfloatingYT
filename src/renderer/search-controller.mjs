@@ -1,4 +1,4 @@
-import { parseYouTubeInput } from '../shared/youtube-url.mjs';
+import { isSupportedVideoLink, parseTwitchInput } from '../shared/twitch-url.mjs';
 
 const SEARCH_DELAY = 260;
 
@@ -25,7 +25,7 @@ export class SearchController {
     input.addEventListener('keydown', (event) => this.#onKeyDown(event));
     input.addEventListener('paste', (event) => {
       const text = event.clipboardData?.getData('text') || '';
-      if (!parseYouTubeInput(text)) return;
+      if (!isSupportedVideoLink(text)) return;
       event.preventDefault();
       input.value = text.trim();
       this.#play(text);
@@ -69,7 +69,7 @@ export class SearchController {
     this.sequence += 1;
     this.elements.input.value = '';
     this.#clearResults();
-    this.#feedback('Suchbegriff eingeben oder YouTube-Link einfügen');
+    this.#feedback('Suchbegriff eingeben oder YouTube-/Twitch-Link einfügen');
     this.#syncClearButton();
   }
 
@@ -79,12 +79,12 @@ export class SearchController {
     this.#clearResults();
     this.#syncClearButton();
     const query = this.elements.input.value.trim();
-    if (parseYouTubeInput(query)) {
-      this.#feedback('YouTube-Link erkannt · Enter zum Abspielen');
+    if (isSupportedVideoLink(query)) {
+      this.#feedback(`${parseTwitchInput(query) ? 'Twitch' : 'YouTube'}-Link erkannt · Enter zum Abspielen`);
       return;
     }
     if (query.length < 2) {
-      this.#feedback(query ? 'Noch ein Zeichen für die Suche …' : 'Suchbegriff eingeben oder YouTube-Link einfügen');
+      this.#feedback(query ? 'Noch ein Zeichen für die Suche …' : 'Suchbegriff eingeben oder YouTube-/Twitch-Link einfügen');
       return;
     }
     this.#feedback('Bereit zur Suche');
@@ -193,7 +193,7 @@ export class SearchController {
     } else if (event.key === 'Enter') {
       event.preventDefault();
       const value = this.active >= 0 ? this.items[this.active]?.id : this.elements.input.value;
-      if (parseYouTubeInput(value)) this.#play(value);
+      if (isSupportedVideoLink(value)) this.#play(value);
       else if (this.elements.input.value.trim().length >= 2) {
         clearTimeout(this.timer);
         void this.#search(this.elements.input.value.trim());

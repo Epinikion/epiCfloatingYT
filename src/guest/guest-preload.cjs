@@ -11,7 +11,7 @@ const HOST_SOURCE = 'floatingyt-host';
 const FORWARDED_EVENTS = new Set([
   'video-metadata', 'drag-start', 'drag-move', 'drag-end',
   'fullscreen-toggle', 'fullscreen-leave', 'watch-status',
-  'boost-status', 'quality-status',
+  'boost-status', 'quality-status', 'twitch-title',
 ]);
 const ASPECT_EPSILON = 0.0005;
 const NEAR_FIT_MAX_GAP = 3;
@@ -68,7 +68,8 @@ if (isLocal && isTop) {
 function validExtensionOrigin(origin) {
   try {
     const host = new URL(origin).hostname.toLowerCase();
-    return ['youtube.com', 'youtube-nocookie.com'].some((domain) => host === domain || host.endsWith(`.${domain}`));
+    return host === 'player.twitch.tv'
+      || ['youtube.com', 'youtube-nocookie.com'].some((domain) => host === domain || host.endsWith(`.${domain}`));
   } catch {
     return false;
   }

@@ -53,5 +53,5 @@ test('blocks the YouTube and native video context menus', () => {
   assert.match(content, /addEventListener\('contextmenu'/);
   assert.match(content, /event\.preventDefault\(\)/);
   assert.match(content, /event\.stopImmediatePropagation\(\)/);
-  assert.match(content, /if \(youtube\) installContextMenuBlocker\(\)/);
+  assert.match(content, /if \(youtube \|\| twitch\) installContextMenuBlocker\(\)/);
 });

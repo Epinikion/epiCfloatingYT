@@ -1,3 +1,4 @@
+import { buildTwitchUrl, parseTwitchInput } from '../shared/twitch-url.mjs';
 import { buildEmbedUrl, buildWatchUrl, isPersonalPlaylist, parseYouTubeInput } from '../shared/youtube-url.mjs';
 
 const BLOCKED_ERRORS = new Set([100, 101, 150, 'timeout']);
@@ -51,18 +52,14 @@ export class PlaybackController {
   }
 
   load(input, options = {}) {
+    const twitch = parseTwitchInput(input);
+    if (twitch) return this.#loadTwitch(twitch);
     const parsed = parseYouTubeInput(input);
     if (!parsed) {
-      this.hooks.toast('Kein gültiger YouTube-Link');
+      this.hooks.toast('Kein gültiger YouTube- oder Twitch-Link');
       return false;
     }
-    this.generation += 1;
-    this.lastBlockedId = '';
-    this.boostWarningId = '';
-    this.preferredQuality = 'auto';
-    this.pendingQuality = null;
-    this.qualityCommandSent = false;
-    this.qualityLevels = [];
+    this.#beginSession();
     const queue = normalizeYouTubeQueue(options.queue);
     this.current = { ...parsed, mode: 'embed', queue: queue.length ? queue : null };
     this.hooks.setEmpty(false);
@@ -87,13 +84,7 @@ export class PlaybackController {
     const requested = Math.trunc(Number(requestedIndex) || 0);
     const index = Math.max(0, Math.min(queue.length - 1, requested));
     const selected = queue[index];
-    this.generation += 1;
-    this.lastBlockedId = '';
-    this.boostWarningId = '';
-    this.preferredQuality = 'auto';
-    this.pendingQuality = null;
-    this.qualityCommandSent = false;
-    this.qualityLevels = [];
+    this.#beginSession();
     this.current = { mode: 'local', queue, index, id: selected.id, name: selected.name, list: null, start: 0 };
     this.hooks.setEmpty(false);
     this.hooks.setPlaylist(queue.length > 1);
@@ -102,6 +93,33 @@ export class PlaybackController {
     this.player.src = buildLocalUrl(this.baseUrl, selected);
     this.player.focus();
     return true;
+  }
+
+  #loadTwitch(parsed) {
+    if (parsed.clip) {
+      this.hooks.toast('Twitch-Clips werden noch nicht unterstützt');
+      return false;
+    }
+    this.#beginSession();
+    const id = parsed.video || parsed.channel;
+    this.current = { mode: 'twitch', id, video: parsed.video, channel: parsed.channel, start: parsed.start, list: null, queue: null };
+    this.hooks.setEmpty(false);
+    this.hooks.setPlaylist(false);
+    this.hooks.setQueue?.(null);
+    this.hooks.setTitle(parsed.channel ? `${parsed.channel} · Twitch` : 'Twitch-Video');
+    this.player.src = buildTwitchUrl(this.baseUrl, this.current);
+    this.player.focus();
+    return true;
+  }
+
+  #beginSession() {
+    this.generation += 1;
+    this.lastBlockedId = '';
+    this.boostWarningId = '';
+    this.preferredQuality = 'auto';
+    this.pendingQuality = null;
+    this.qualityCommandSent = false;
+    this.qualityLevels = [];
   }
 
   clear() {
@@ -143,6 +161,10 @@ export class PlaybackController {
       this.hooks.toast(forward ? 'Keine weitere lokale Datei' : 'Keine vorherige lokale Datei');
       return false;
     }
+    if (this.current.mode === 'twitch') {
+      this.hooks.toast('Keine Playlist bei Twitch');
+      return false;
+    }
     if (isPersonalPlaylist(this.current.list)) {
       if (this.#stepQueue(forward)) return true;
       this.hooks.toast('Kein weiteres Video in der Liste');
@@ -181,6 +203,7 @@ export class PlaybackController {
       this.preferredQuality = quality;
       this.pendingQuality = this.current?.mode === 'watch' ? quality : null;
       this.qualityCommandSent = false;
+      if (this.current?.mode === 'twitch') { this.send('quality', quality); return; }
       if (this.current?.mode === 'embed') void this.#reloadEmbedForQuality();
       else this.#sendPendingQuality();
       return;
@@ -255,6 +278,20 @@ export class PlaybackController {
     if (type === 'embed-status') await this.#handleEmbedStatus(payload);
     else if (type === 'watch-status') await this.#handleWatchStatus(payload);
     else if (type === 'local-status') this.#handleLocalStatus(payload);
+    else if (type === 'twitch-status') this.#handleTwitchStatus(payload);
+    else if (type === 'twitch-title' && this.current.mode === 'twitch' && payload.title) this.hooks.setTitle(String(payload.title).slice(0, 240));
+  }
+
+  #handleTwitchStatus(status) {
+    if (this.current?.mode !== 'twitch') return;
+    if (status.ready && this.soundBoost > 1 && this.boostWarningId !== this.current.id) {
+      this.boostWarningId = this.current.id;
+      this.hooks.toast('Soundboost ist für diese Medienquelle nicht verfügbar');
+    }
+    if (!status.error || status.error === this.current.error) return;
+    this.current.error = status.error;
+    if (status.error === 'offline') this.hooks.toast(`${this.current.channel || 'Der Kanal'} ist gerade offline`);
+    else if (['script', 'timeout'].includes(status.error)) this.hooks.toast('Twitch-Player konnte nicht geladen werden');
   }
 
   #handleLocalStatus(status) {

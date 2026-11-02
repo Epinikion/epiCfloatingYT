@@ -1,4 +1,4 @@
-import { parseYouTubeInput } from '../shared/youtube-url.mjs';
+import { isSupportedVideoLink } from '../shared/twitch-url.mjs';
 import { PlaybackController } from './playback-controller.mjs';
 import { SearchController } from './search-controller.mjs';
 import { AmbientLight, ResizeSmoother } from './visual-effects.mjs';
@@ -110,7 +110,7 @@ class FloatingApp {
     }
     this.layout();
     this.setEmpty(true);
-    if (parseYouTubeInput(state.clipboard)) this.searchController.setValue(state.clipboard);
+    if (isSupportedVideoLink(state.clipboard)) this.searchController.setValue(state.clipboard);
     this.elements['url-input'].focus();
   }
 
@@ -583,7 +583,7 @@ class FloatingApp {
     }
     switch (message?.name) {
       case 'load-url':
-        if (parseYouTubeInput(message.url)) {
+        if (isSupportedVideoLink(message.url)) {
           this.searchController.reset();
           this.toggleSearch(false);
           this.playback?.load(message.url);

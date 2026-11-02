@@ -13,7 +13,11 @@ const STATIC_FILES = new Map([
   ['/local.html', ['local.html', 'text/html; charset=utf-8']],
   ['/local.js', ['local.js', 'text/javascript; charset=utf-8']],
   ['/local.css', ['local.css', 'text/css; charset=utf-8']],
+  ['/twitch.html', ['twitch.html', 'text/html; charset=utf-8']],
+  ['/twitch.js', ['twitch.js', 'text/javascript; charset=utf-8']],
 ]);
+const YOUTUBE_ORIGINS = 'https://www.youtube.com https://www.youtube-nocookie.com';
+const TWITCH_ORIGINS = 'https://player.twitch.tv';
 
 function parseRange(header, size) {
   if (!header) return null;
@@ -110,14 +114,14 @@ class LocalPlayerServer {
         'x-content-type-options': 'nosniff',
         'content-security-policy': [
           "default-src 'none'",
-          "script-src 'self' https://www.youtube.com https://www.youtube-nocookie.com",
-          "frame-src https://www.youtube-nocookie.com https://www.youtube.com",
-          // The YouTube IFrame API applies sizing styles to the iframe it
-          // creates inside this otherwise fully local, controlled document.
+          `script-src 'self' ${YOUTUBE_ORIGINS} ${TWITCH_ORIGINS}`,
+          `frame-src ${YOUTUBE_ORIGINS} ${TWITCH_ORIGINS}`,
+          // The YouTube and Twitch embed scripts apply sizing styles to the
+          // iframe they create inside this otherwise fully local document.
           "style-src 'self' 'unsafe-inline'",
           "img-src 'self' data:",
           "media-src 'self'",
-          "connect-src 'self' https://www.youtube.com https://www.youtube-nocookie.com",
+          `connect-src 'self' ${YOUTUBE_ORIGINS} ${TWITCH_ORIGINS}`,
         ].join('; '),
       });
       response.end(request.method === 'HEAD' ? undefined : data);
