@@ -16,7 +16,7 @@ test('exposes a complete shortcut and gesture help from every discoverable entry
   }
   for (const label of [
     'Leertaste', 'Strg', 'Shift', 'F1', 'Wiedergabe / Pause', 'Ton an / aus',
-    'Lautstärke erhöhen / verringern', 'Einfacher Klick', 'Keine Wiedergabeaktion',
+    'Lautstärke erhöhen / verringern', '10 Sekunden zurück / vor', 'Einfacher Klick', 'Keine Wiedergabeaktion',
     'Klicks gehen an das Fenster darunter',
     'Datei / Ordner ablegen', 'Lokale Videos einzeln oder als Liste abspielen',
     'Soundboost', 'bis 300 % verstärken', 'Playlist-Symbol', 'Lokale oder YouTube-Warteschlange anzeigen',

@@ -33,3 +33,20 @@ test('opens the playlist shortcut without toggling always-on-top', () => {
   assert.deepEqual(messages, [{ channel: 'app:shortcut', payload: { name: 'playlist' } }]);
   assert.equal(pinToggles, 0);
 });
+
+test('turns arrow keys and J/L inside the player into ten-second seeks', () => {
+  const controller = new WindowController({});
+  const messages = [];
+  controller.window = {};
+  controller.send = (channel, payload) => messages.push({ channel, payload });
+
+  assert.equal(controller.handleInput({ type: 'keyDown', key: 'ArrowLeft' }, true), true);
+  assert.equal(controller.handleInput({ type: 'keyDown', key: 'l' }, true), true);
+  assert.equal(controller.handleInput({ type: 'keyDown', key: 'ArrowRight', control: true }, true), true);
+  assert.equal(controller.handleInput({ type: 'keyDown', key: 'ArrowRight' }, false), false);
+  assert.deepEqual(messages.map(({ payload }) => payload), [
+    { name: 'seek', delta: -10 },
+    { name: 'seek', delta: 10 },
+    { name: 'next' },
+  ]);
+});

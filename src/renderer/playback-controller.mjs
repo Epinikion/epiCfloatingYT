@@ -11,6 +11,16 @@ function normalizeYouTubeQueue(values) {
     .filter((id) => YOUTUBE_VIDEO_ID.test(id) && !seen.has(id) && seen.add(id));
 }
 
+function formatTime(value) {
+  const seconds = Math.max(0, Math.floor(Number(value) || 0));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainder = seconds % 60;
+  return hours
+    ? `${hours}:${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`
+    : `${minutes}:${String(remainder).padStart(2, '0')}`;
+}
+
 function buildLocalUrl(baseUrl, item) {
   const query = new URLSearchParams({ media: item.id, name: item.name });
   return `${String(baseUrl).replace(/\/$/, '')}/local.html?${query}`;
@@ -112,6 +122,10 @@ export class PlaybackController {
   togglePlay() { this.send('toggle'); }
   toggleMute() { this.send('mute-toggle'); }
   adjustVolume(delta) { this.send('volume-step', Math.max(-100, Math.min(100, Math.round(Number(delta) || 0)))); }
+  seek(delta) {
+    const seconds = Math.max(-600, Math.min(600, Math.round(Number(delta) || 0)));
+    if (seconds) this.send('seek', seconds);
+  }
 
   selectQueue(index) {
     if (!this.current || !Number.isInteger(index)) return false;
@@ -228,6 +242,13 @@ export class PlaybackController {
     }
     if (type === 'volume-change') {
       this.hooks.setVolume?.(Number(payload.volume), Boolean(payload.muted));
+      return;
+    }
+    if (type === 'seek-change') {
+      const delta = Math.round(Number(payload.delta) || 0);
+      if (!delta) return;
+      const position = Number.isFinite(Number(payload.time)) ? ` · ${formatTime(payload.time)}${Number(payload.duration) > 0 ? ` / ${formatTime(payload.duration)}` : ''}` : '';
+      this.hooks.toast(`${delta > 0 ? '+' : '−'}${Math.abs(delta)} s${position}`);
       return;
     }
     if (!this.current) return;

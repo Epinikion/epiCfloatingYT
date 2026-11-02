@@ -189,6 +189,11 @@ class FloatingApp {
         event.preventDefault();
         this.playback?.adjustVolume(key === 'arrowup' ? 5 : -5);
       }
+      else if (!event.shiftKey && ['arrowleft', 'arrowright', 'j', 'l'].includes(key)
+        && !event.target.closest('input,button,select,[role="slider"],[role="tab"],[contenteditable="true"]')) {
+        event.preventDefault();
+        this.playback?.seek(['arrowright', 'l'].includes(key) ? 10 : -10);
+      }
       else if (key === 'escape') this.#hideToolbar();
     });
 
@@ -587,6 +592,7 @@ class FloatingApp {
       case 'play-pause': this.playback?.togglePlay(); break;
       case 'mute': this.playback?.toggleMute(); break;
       case 'volume-step': this.playback?.adjustVolume(message.delta); break;
+      case 'seek': this.playback?.seek(message.delta); break;
       case 'next': void this.playback?.neighbour(true); break;
       case 'previous': void this.playback?.neighbour(false); break;
       case 'menu': this.toggleMenu(); break;

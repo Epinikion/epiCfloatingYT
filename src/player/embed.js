@@ -141,6 +141,13 @@ hostBridge.onCommand((command) => {
     player.setVolume?.(volume);
     if (volume > 0) player.unMute?.();
     hostBridge.emit('volume-change', { volume, muted: player.isMuted?.() ?? volume === 0 });
+  } else if (command.name === 'seek') {
+    const delta = Number(value) || 0;
+    const duration = Number(player.getDuration?.()) || 0;
+    const target = Math.max(0, (Number(player.getCurrentTime?.()) || 0) + delta);
+    const time = duration > 0 ? Math.min(target, Math.max(0, duration - 0.5)) : target;
+    player.seekTo?.(time, true);
+    hostBridge.emit('seek-change', { delta, time, duration });
   } else if (command.name === 'muted') value ? player.mute?.() : player.unMute?.();
   else if (command.name === 'rate') player.setPlaybackRate?.(Number(value));
   else if (command.name === 'quality') {

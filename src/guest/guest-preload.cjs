@@ -197,6 +197,11 @@ function playerCommandSource(command) {
       const delta = Math.max(-100, Math.min(100, Math.round(Number(value) || 0)));
       return `(() => {const p=${player},v=${video},d=${delta};if(p?.setVolume){const n=Math.max(0,Math.min(100,Math.round((p.getVolume?.()??100)+d)));p.setVolume(n);if(n>0)p.unMute?.();return{volume:n,muted:p.isMuted?.()??n===0}}if(v){const n=Math.max(0,Math.min(100,Math.round(v.volume*100+d)));v.volume=n/100;if(n>0)v.muted=false;return{volume:n,muted:v.muted}}return null})()`;
     }
+    case 'seek': {
+      const delta = Math.max(-600, Math.min(600, Math.round(Number(value) || 0)));
+      if (!delta) return null;
+      return `(() => {const p=${player},v=${video},d=${delta};const now=Number(p?.getCurrentTime?.()??v?.currentTime)||0,dur=Number(p?.getDuration?.()??v?.duration)||0,t=Math.max(0,dur>0?Math.min(now+d,dur-.5):now+d);if(p?.seekTo)p.seekTo(t,true);else if(v)v.currentTime=t;else return null;return{delta:d,time:t,duration:dur}})()`;
+    }
     case 'muted': return `(() => {const p=${player},v=${video};if(p){${value ? 'p.mute?.()' : 'p.unMute?.()'};return true}if(v){v.muted=${Boolean(value)};return true}return false})()`;
     case 'rate': return Number.isFinite(Number(value)) ? `(() => {const p=${player},v=${video};if(p?.setPlaybackRate){p.setPlaybackRate(${Number(value)});return true}if(v){v.playbackRate=${Number(value)};return true}return false})()` : null;
     case 'boost': {
@@ -224,6 +229,7 @@ async function handleYouTubeCommand(command) {
   try { result = await webFrame.executeJavaScript(source, true); } catch {}
   if (command.name === 'info') send('player-info', { requestId: command.requestId, info: result });
   else if (command.name === 'volume-step' && result) send('volume-change', result);
+  else if (command.name === 'seek' && result) send('seek-change', result);
 }
 
 function boot() {

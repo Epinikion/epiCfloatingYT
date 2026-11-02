@@ -340,3 +340,26 @@ test('resolves a favourites list through the managed queue instead of the embed'
   assert.equal(controller.selectQueue(2), true);
   assert.equal(player.src, 'http://127.0.0.1:3210/embed.html?v=YdYqwJxA-ro');
 });
+
+test('seeks the active player by ten seconds and confirms the new position', async () => {
+  const player = new FakePlayer();
+  const toasts = [];
+  const controller = new PlaybackController({
+    player,
+    baseUrl: 'http://127.0.0.1:3210',
+    api: {},
+    hooks: { toast: (message) => toasts.push(message), setEmpty() {}, setPlaylist() {}, setTitle() {}, openMenu() {} },
+  });
+
+  controller.seek(10);
+  assert.equal(player.commands.length, 0);
+
+  controller.load('AAAAAAAAAAA');
+  controller.seek(-10);
+  assert.deepEqual(player.commands.at(-1), { channel: 'guest-command', payload: { name: 'seek', value: -10 } });
+
+  player.emitGuest('seek-change', { delta: -10, time: 72.4, duration: 245 });
+  player.emitGuest('seek-change', { delta: 10, time: 3725, duration: 0 });
+  await settle();
+  assert.deepEqual(toasts.slice(-2), ['−10 s · 1:12 / 4:05', '+10 s · 1:02:05']);
+});

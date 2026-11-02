@@ -16,6 +16,7 @@ const AMBIENT_INTERVAL = 80;
 const AMBIENT_WIDTH = 80;
 const AMBIENT_HEIGHT = 45;
 const ASPECT_EPSILON = 0.0005;
+const SEEK_STEP = 10;
 
 function isAllowedGuestUrl(rawUrl, localOrigin) {
   if (rawUrl === 'about:blank') return true;
@@ -176,6 +177,10 @@ class WindowController {
     if (fromGuest && key === 'm') { this.send('app:shortcut', { name: 'mute' }); return true; }
     if (fromGuest && !control && !input.alt && !input.shift && ['arrowup', 'arrowdown'].includes(key)) {
       this.send('app:shortcut', { name: 'volume-step', delta: key === 'arrowup' ? 5 : -5 });
+      return true;
+    }
+    if (fromGuest && !control && !input.alt && !input.shift && ['arrowleft', 'arrowright', 'j', 'l'].includes(key)) {
+      this.send('app:shortcut', { name: 'seek', delta: ['arrowright', 'l'].includes(key) ? SEEK_STEP : -SEEK_STEP });
       return true;
     }
     if (fromGuest && key === 'f') { this.toggleFullscreen(); return true; }

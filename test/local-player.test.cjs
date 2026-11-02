@@ -19,6 +19,7 @@ test('provides a focused local HTML5 video player with matching controls', () =>
   assert.match(html, /id="timeline"[^>]*type="range"/);
   assert.match(html, /id="time"[^>]*role="timer"/);
   assert.match(script, /command\.name === 'volume-step'/);
+  assert.match(script, /command\.name === 'seek'/);
   assert.match(script, /command\.name === 'boost'/);
   assert.match(script, /createMediaElementSource\(video\)/);
   assert.match(script, /window\.floatingHost\.emit\('local-status'/);

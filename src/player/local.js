@@ -130,6 +130,15 @@ window.floatingHost.onCommand((command) => {
     video.volume = volume / 100;
     if (volume > 0) video.muted = false;
     window.floatingHost.emit('volume-change', { volume, muted: video.muted });
+  } else if (command.name === 'seek') {
+    const delta = Number(value) || 0;
+    const duration = Number(video.duration);
+    if (!delta || !Number.isFinite(video.currentTime)) return;
+    const target = Math.max(0, video.currentTime + delta);
+    video.currentTime = Number.isFinite(duration) && duration > 0 ? Math.min(target, Math.max(0, duration - 0.25)) : target;
+    revealControls();
+    updateTimeline();
+    window.floatingHost.emit('seek-change', { delta, time: video.currentTime, duration: Number.isFinite(duration) ? duration : 0 });
   } else if (command.name === 'muted') video.muted = Boolean(value);
   else if (command.name === 'rate') video.playbackRate = Math.max(.25, Math.min(4, Number(value) || 1));
   else if (command.name === 'boost') void applySoundBoost(value);
