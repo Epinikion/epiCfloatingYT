@@ -55,3 +55,8 @@ test('blocks the YouTube and native video context menus', () => {
   assert.match(content, /event\.stopImmediatePropagation\(\)/);
   assert.match(content, /if \(youtube \|\| twitch\) installContextMenuBlocker\(\)/);
 });
+
+test('draws the player one pixel past the stage so its scaled edge is clipped', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'styles.css'), 'utf8');
+  assert.match(css, /#player \{[^}]*inset: -1px; width: calc\(100% \+ 2px\); height: calc\(100% \+ 2px\);/);
+});

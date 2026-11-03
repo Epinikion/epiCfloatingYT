@@ -21,7 +21,9 @@ button svg { width: 15px; height: 15px; display: block; fill: none; stroke: curr
   background: #000;
   clip-path: inset(0 round 12px);
 }
-#player { position: absolute; inset: 0; width: 100%; height: 100%; display: flex; border: 0; background: #000; }
+/* Scaling the video down leaves a bright overshoot in its outermost pixel row.
+   Drawing the player one pixel past every stage edge lets the stage clip it. */
+#player { position: absolute; inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); display: flex; border: 0; background: #000; }
 #player.resize-frozen { transform-origin: 0 0; will-change: transform; }
 #resize-snapshot { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
 #resize-snapshot[hidden] { display: none; }
