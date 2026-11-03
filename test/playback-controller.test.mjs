@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { PlaybackController } from '../src/renderer/playback-controller.mjs';
+import { ResumeStore } from '../src/renderer/resume-store.mjs';
 
 class FakePlayer {
   constructor() {
@@ -400,4 +401,77 @@ test('plays Twitch VODs and channels in the local Twitch player', async () => {
 
   assert.equal(controller.load('https://clips.twitch.tv/FunnyClip-abc_123'), false);
   assert.equal(toasts.at(-1), 'Twitch-Clips werden noch nicht unterstützt');
+});
+
+test('resumes YouTube videos at the point from the signed-in history', async () => {
+  const player = new FakePlayer();
+  const toasts = [];
+  const accounts = [];
+  const controller = new PlaybackController({
+    player,
+    baseUrl: 'http://127.0.0.1:3210',
+    api: { youtubeAccount: async () => ({ status: 'ok', browser: 'firefox', times: { 'viyGj8-jl5s': 1216 } }) },
+    hooks: { toast: (message) => toasts.push(message), setEmpty() {}, setPlaylist() {}, setQueue() {}, setTitle() {}, openMenu() {}, setAccount: (account) => accounts.push(account.status) },
+  });
+  const resumes = () => player.commands.filter(({ payload }) => payload.name === 'resume');
+
+  controller.load('https://www.youtube.com/watch?v=viyGj8-jl5s');
+  await settle();
+  assert.deepEqual(accounts, ['ok']);
+  assert.equal(resumes().length, 0);
+  player.emitGuest('embed-status', { ready: true, state: 1, videoId: 'viyGj8-jl5s' });
+  player.emitGuest('embed-status', { ready: true, state: 1, videoId: 'viyGj8-jl5s' });
+  await settle();
+  assert.deepEqual(resumes().map(({ payload }) => payload.value), [1216]);
+  player.emitGuest('resume-change', { time: 1216, duration: 4250 });
+  await settle();
+  assert.equal(toasts.at(-1), 'Fortgesetzt bei 20:16 · YouTube-Verlauf');
+
+  controller.load('https://www.youtube.com/watch?v=viyGj8-jl5s&t=90');
+  await settle();
+  player.emitGuest('embed-status', { ready: true, state: 1, videoId: 'viyGj8-jl5s' });
+  await settle();
+  assert.equal(resumes().length, 1);
+});
+
+test('remembers YouTube positions in the app and prefers newer history points', async () => {
+  const storage = new Map();
+  const resumeStore = new ResumeStore({ getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) });
+  const player = new FakePlayer();
+  const toasts = [];
+  let history = { 'viyGj8-jl5s': 1216 };
+  const controller = new PlaybackController({
+    player,
+    baseUrl: 'http://127.0.0.1:3210',
+    resumeStore,
+    api: { youtubeAccount: async () => ({ status: 'ok', browser: 'chrome', times: history }) },
+    hooks: { toast: (message) => toasts.push(message), setEmpty() {}, setPlaylist() {}, setQueue() {}, setTitle() {}, openMenu() {}, setAccount() {} },
+  });
+  const lastResume = () => player.commands.filter(({ payload }) => payload.name === 'resume').at(-1)?.payload.value;
+  const play = async () => {
+    controller.load('https://www.youtube.com/watch?v=viyGj8-jl5s');
+    await settle();
+    player.emitGuest('embed-status', { ready: true, state: 1, videoId: 'viyGj8-jl5s' });
+    await settle();
+  };
+
+  await play();
+  assert.equal(lastResume(), 1216);
+  player.emitGuest('position', { videoId: 'viyGj8-jl5s', time: 3000.4, duration: 4250 });
+  await settle();
+  assert.deepEqual({ ...resumeStore.get('viyGj8-jl5s'), at: 0 }, { time: 3000, at: 0, history: 1216 });
+
+  await play();
+  assert.equal(lastResume(), 3000);
+  player.emitGuest('resume-change', { time: 3000, duration: 4250 });
+  await settle();
+  assert.equal(toasts.at(-1), 'Fortgesetzt bei 50:00 · zuletzt in FloatingYT');
+
+  history = { 'viyGj8-jl5s': 3600 };
+  await play();
+  assert.equal(lastResume(), 3600);
+
+  player.emitGuest('position', { videoId: 'viyGj8-jl5s', time: 4245, duration: 4250 });
+  await settle();
+  assert.equal(resumeStore.get('viyGj8-jl5s'), null);
 });

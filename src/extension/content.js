@@ -219,6 +219,13 @@
       const signature = JSON.stringify(payload);
       if (signature !== last) { last = signature; emit('watch-status', payload); }
     }, 750);
+    const position = () => {
+      const video = document.querySelector('video');
+      const videoId = new URL(location.href).searchParams.get('v') || '';
+      if (video && videoId) emit('position', { videoId, time: video.currentTime || 0, duration: video.duration || 0, ended: video.ended });
+    };
+    setInterval(() => { if (!document.querySelector('video')?.paused) position(); }, 5000);
+    for (const name of ['pause', 'ended', 'seeked']) document.addEventListener(name, position, true);
   }
 
   // The Twitch embed has no title API, so read the one its overlay shows.

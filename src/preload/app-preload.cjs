@@ -61,6 +61,8 @@ contextBridge.exposeInMainWorld('floatingApi', {
   resolveVideoMetadata: (ids) => ipcRenderer.invoke('video:metadata', ids),
   cookieBrowsers: () => ipcRenderer.invoke('settings:cookie-browsers'),
   setCookieBrowser: (browser) => ipcRenderer.invoke('settings:set-cookie-browser', browser),
+  youtubeAccount: (refresh = false) => ipcRenderer.invoke('youtube:account', refresh === true),
+  importCookieFile: () => ipcRenderer.invoke('youtube:import-cookie-file'),
   setCaption: (caption) => ipcRenderer.invoke('settings:set-caption', caption),
   setSoundBoost: (value) => ipcRenderer.invoke('settings:set-sound-boost', value),
   onLocalDrop: (callback) => {

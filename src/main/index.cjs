@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('node:path');
-const { app, BrowserWindow, clipboard, ipcMain, screen, session } = require('electron');
+const { app, BrowserWindow, clipboard, dialog, ipcMain, screen, session } = require('electron');
 const { attachAdBlocker } = require('./adblock.cjs');
 const { LocalPlayerServer } = require('./local-server.cjs');
 const { collectMediaFiles } = require('./local-media.cjs');
@@ -10,6 +10,7 @@ const { COOKIE_BROWSERS, StateStore, caption, cookieBrowser, soundBoost } = requ
 const { VideoMetadataService } = require('./video-metadata.cjs');
 const { VideoSearchService } = require('./video-search.cjs');
 const { WindowController } = require('./window-controller.cjs');
+const { importCookieFile } = require('./cookie-file.cjs');
 
 const ROOT = path.join(__dirname, '..', '..');
 const PARTITION = 'persist:floatingyt';
@@ -25,13 +26,18 @@ let controller = null;
 let playerServer = null;
 let store = null;
 
+// Google and YouTube treat the default Electron user agent as an unknown browser.
+function usePlainUserAgent(target) {
+  const userAgent = target.getUserAgent()
+    .replace(/\sElectron\/[\d.]+/, '')
+    .replace(new RegExp(`\\s${app.getName()}\\/[\\d.]+`, 'i'), '');
+  target.setUserAgent(userAgent);
+}
+
 async function configureYouTubeSession() {
   const youtubeSession = session.fromPartition(PARTITION);
   attachAdBlocker(youtubeSession);
-  const userAgent = youtubeSession.getUserAgent()
-    .replace(/\sElectron\/[\d.]+/, '')
-    .replace(new RegExp(`\\s${app.getName()}\\/[\\d.]+`, 'i'), '');
-  youtubeSession.setUserAgent(userAgent);
+  usePlainUserAgent(youtubeSession);
   youtubeSession.setPermissionRequestHandler((_contents, permission, callback) => callback(permission === 'fullscreen'));
   const extensionDirectory = app.isPackaged
     ? path.join(process.resourcesPath, 'floatingyt-extension')
@@ -44,7 +50,7 @@ function findStartUrl(argv) {
   return argv.slice(1).find((argument) => /^(https?:\/\/)?([\w-]+\.)*(youtube\.com|youtube-nocookie\.com|youtu\.be|twitch\.tv)\//i.test(argument)) || null;
 }
 
-function registerIpc({ resolver, search, metadata }) {
+function registerIpc({ resolver, search, metadata, cookieFile }) {
   ipcMain.handle('app:get-state', () => ({
     ...store.value,
     baseUrl: playerServer.baseUrl,
@@ -68,7 +74,23 @@ function registerIpc({ resolver, search, metadata }) {
   ipcMain.handle('settings:cookie-browsers', () => COOKIE_BROWSERS);
   ipcMain.handle('settings:set-cookie-browser', (_event, value) => {
     store.patch((state) => { state.cookieBrowser = cookieBrowser(value); });
+    resolver.forgetAccount();
     return store.value.cookieBrowser;
+  });
+  ipcMain.handle('youtube:account', (_event, refresh) => resolver.youtubeAccount({ refresh: refresh === true }));
+  ipcMain.handle('youtube:import-cookie-file', async () => {
+    const options = {
+      title: 'YouTube-Cookie-Datei wählen',
+      filters: [{ name: 'Cookie-Datei', extensions: ['txt'] }],
+      properties: ['openFile'],
+    };
+    const choice = controller?.window ? await dialog.showOpenDialog(controller.window, options) : await dialog.showOpenDialog(options);
+    if (choice.canceled || !choice.filePaths[0]) return { canceled: true };
+    const { error } = await importCookieFile(choice.filePaths[0], cookieFile);
+    if (error) return { error };
+    store.patch((state) => { state.cookieBrowser = 'file'; });
+    resolver.forgetAccount();
+    return { browser: store.value.cookieBrowser, account: await resolver.youtubeAccount({ refresh: true }) };
   });
   ipcMain.handle('settings:set-caption', (_event, value) => {
     store.patch((state) => { state.caption = caption(value); });
@@ -107,13 +129,14 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(async () => {
     store = new StateStore(path.join(app.getPath('userData'), 'state.json'));
-    const resolver = new MediaResolver({ cookieBrowser: () => store.value.cookieBrowser });
+    const cookieFile = path.join(app.getPath('userData'), 'youtube-cookies.txt');
+    const resolver = new MediaResolver({ cookieBrowser: () => store.value.cookieBrowser, cookieFile: () => cookieFile });
     playerServer = new LocalPlayerServer({ playerDirectory: path.join(ROOT, 'src', 'player') });
     await playerServer.start();
     const youtubeSession = await configureYouTubeSession();
     const search = new VideoSearchService({ fetchImpl: youtubeSession.fetch.bind(youtubeSession) });
     const metadata = new VideoMetadataService({ fetchImpl: youtubeSession.fetch.bind(youtubeSession) });
-    registerIpc({ resolver, search, metadata });
+    registerIpc({ resolver, search, metadata, cookieFile });
     controller = new WindowController({
       BrowserWindow,
       screen,

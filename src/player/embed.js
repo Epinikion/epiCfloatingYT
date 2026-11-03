@@ -29,6 +29,21 @@ function synchronize() {
   emitStatus();
 }
 
+// The app remembers this position to resume the video later.
+let lastPosition = -1;
+function emitPosition() {
+  try {
+    const time = Number(player?.getCurrentTime?.()) || 0;
+    lastPosition = Math.floor(time);
+    hostBridge.emit('position', {
+      videoId: player?.getVideoData?.()?.video_id || status.videoId,
+      time,
+      duration: Number(player?.getDuration?.()) || 0,
+      ended: status.state === 0,
+    });
+  } catch {}
+}
+
 function fit() {
   player?.setSize?.(window.innerWidth, window.innerHeight);
 }
@@ -83,6 +98,7 @@ window.onYouTubeIframeAPIReady = () => {
         status.state = event.data;
         if ([YT.PlayerState.PLAYING, YT.PlayerState.BUFFERING].includes(event.data)) status.error = null;
         synchronize();
+        if ([YT.PlayerState.PAUSED, YT.PlayerState.ENDED].includes(event.data)) emitPosition();
       },
     },
   });
@@ -148,6 +164,13 @@ hostBridge.onCommand((command) => {
     const time = duration > 0 ? Math.min(target, Math.max(0, duration - 0.5)) : target;
     player.seekTo?.(time, true);
     hostBridge.emit('seek-change', { delta, time, duration });
+  } else if (command.name === 'resume') {
+    // Only resume while the video is still near its start, never into the last seconds.
+    const time = Math.floor(Number(value) || 0);
+    const duration = Number(player.getDuration?.()) || 0;
+    if (time < 10 || !(duration > 0) || time > duration - 20 || (Number(player.getCurrentTime?.()) || 0) > 30) return;
+    player.seekTo?.(time, true);
+    hostBridge.emit('resume-change', { time, duration });
   } else if (command.name === 'muted') value ? player.mute?.() : player.unMute?.();
   else if (command.name === 'rate') player.setPlaybackRate?.(Number(value));
   else if (command.name === 'quality') {
@@ -171,6 +194,11 @@ window.addEventListener('message', (event) => {
   if (event.source !== window || event.data?.source !== 'floatingyt-host' || event.data.type !== 'visual') return;
   relayToPlayer('visual', event.data.payload || {});
 });
+
+// Also report a position that changed while paused, for example after seeking.
+setInterval(() => {
+  if (status.state === 1 || (status.ready && Math.floor(Number(player?.getCurrentTime?.()) || 0) !== lastPosition)) emitPosition();
+}, 5000);
 
 setTimeout(() => {
   if (!status.ready && status.error == null) {

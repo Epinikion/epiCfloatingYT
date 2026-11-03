@@ -5,7 +5,8 @@ const path = require('node:path');
 const { DEFAULT_ASPECT, normalizeAspect } = require('./geometry.cjs');
 
 const STATE_VERSION = 1;
-const COOKIE_BROWSERS = Object.freeze(['', 'firefox', 'chrome', 'edge', 'brave', 'vivaldi', 'opera', 'chromium']);
+// 'file' is an exported cookies.txt, for browsers whose cookies yt-dlp cannot decrypt.
+const COOKIE_BROWSERS = Object.freeze(['', 'file', 'firefox', 'chrome', 'edge', 'brave', 'vivaldi', 'opera', 'chromium']);
 
 function finite(value, min, max, fallback) {
   return Number.isFinite(Number(value)) ? Math.min(max, Math.max(min, Number(value))) : fallback;

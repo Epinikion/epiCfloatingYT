@@ -11,7 +11,7 @@ const HOST_SOURCE = 'floatingyt-host';
 const FORWARDED_EVENTS = new Set([
   'video-metadata', 'drag-start', 'drag-move', 'drag-end',
   'fullscreen-toggle', 'fullscreen-leave', 'watch-status',
-  'boost-status', 'quality-status', 'twitch-title',
+  'boost-status', 'quality-status', 'twitch-title', 'position',
 ]);
 const ASPECT_EPSILON = 0.0005;
 const NEAR_FIT_MAX_GAP = 3;
@@ -203,6 +203,11 @@ function playerCommandSource(command) {
       if (!delta) return null;
       return `(() => {const p=${player},v=${video},d=${delta};const now=Number(p?.getCurrentTime?.()??v?.currentTime)||0,dur=Number(p?.getDuration?.()??v?.duration)||0,t=Math.max(0,dur>0?Math.min(now+d,dur-.5):now+d);if(p?.seekTo)p.seekTo(t,true);else if(v)v.currentTime=t;else return null;return{delta:d,time:t,duration:dur}})()`;
     }
+    case 'resume': {
+      const time = Math.floor(Number(value) || 0);
+      if (time < 10) return null;
+      return `(() => {const p=${player},v=${video},t=${time};const now=Number(p?.getCurrentTime?.()??v?.currentTime)||0,dur=Number(p?.getDuration?.()??v?.duration)||0;if(!(dur>0)||t>dur-20||now>30)return null;if(p?.seekTo)p.seekTo(t,true);else if(v)v.currentTime=t;else return null;return{time:t,duration:dur}})()`;
+    }
     case 'muted': return `(() => {const p=${player},v=${video};if(p){${value ? 'p.mute?.()' : 'p.unMute?.()'};return true}if(v){v.muted=${Boolean(value)};return true}return false})()`;
     case 'rate': return Number.isFinite(Number(value)) ? `(() => {const p=${player},v=${video};if(p?.setPlaybackRate){p.setPlaybackRate(${Number(value)});return true}if(v){v.playbackRate=${Number(value)};return true}return false})()` : null;
     case 'boost': {
@@ -231,6 +236,7 @@ async function handleYouTubeCommand(command) {
   if (command.name === 'info') send('player-info', { requestId: command.requestId, info: result });
   else if (command.name === 'volume-step' && result) send('volume-change', result);
   else if (command.name === 'seek' && result) send('seek-change', result);
+  else if (command.name === 'resume' && result) send('resume-change', result);
 }
 
 function boot() {

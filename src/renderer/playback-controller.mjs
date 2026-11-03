@@ -28,7 +28,7 @@ function buildLocalUrl(baseUrl, item) {
 }
 
 export class PlaybackController {
-  constructor({ player, api, baseUrl, hooks, caption = null, soundBoost = 1 }) {
+  constructor({ player, api, baseUrl, hooks, caption = null, soundBoost = 1, resumeStore = null }) {
     this.player = player;
     this.api = api;
     this.baseUrl = baseUrl;
@@ -48,6 +48,12 @@ export class PlaybackController {
     this.qualityCommandSent = false;
     this.qualitySwitching = false;
     this.qualityLevels = [];
+    this.resumeStore = resumeStore;
+    this.resumeTimes = null;
+    this.historyKnown = false;
+    this.resumeSource = '';
+    this.playingId = '';
+    this.resumedId = '';
     this.#bindPlayer();
   }
 
@@ -70,6 +76,7 @@ export class PlaybackController {
     this.player.src = buildEmbedUrl(this.baseUrl, this.current);
     this.player.focus();
     if (!this.current.queue && isPersonalPlaylist(parsed.list)) void this.#resolvePersonalList(this.generation);
+    void this.#fetchResumeTimes(this.generation);
     return true;
   }
 
@@ -120,6 +127,55 @@ export class PlaybackController {
     this.pendingQuality = null;
     this.qualityCommandSent = false;
     this.qualityLevels = [];
+    this.resumeTimes = null;
+    this.historyKnown = false;
+    this.playingId = '';
+    this.resumedId = '';
+  }
+
+  // YouTube's own resume points come from the signed-in history, read through
+  // the browser cookies. The player only jumps while it is near the start.
+  async #fetchResumeTimes(generation) {
+    let account = null;
+    try { account = await this.api.youtubeAccount?.(); } catch {}
+    if (generation !== this.generation) return;
+    this.historyKnown = account?.status === 'ok' && Boolean(account.times);
+    this.resumeTimes = this.historyKnown ? account.times : {};
+    if (account) this.hooks.setAccount?.(account);
+    this.#maybeResume();
+  }
+
+  #maybeResume() {
+    const current = this.current;
+    if (!current || !['embed', 'watch'].includes(current.mode) || !this.resumeTimes) return;
+    if (!current.id || this.playingId !== current.id || this.resumedId === current.id) return;
+    this.resumedId = current.id;
+    if (current.start) return;
+    const remote = Number(this.resumeTimes[current.id]) || 0;
+    const local = this.resumeStore?.get(current.id);
+    // A YouTube position that changed since the app saved its own means the
+    // video was watched elsewhere in between, so that newer point wins.
+    const useLocal = Boolean(local) && (!remote || local.history === undefined || local.history === remote);
+    const time = useLocal ? local.time : remote;
+    this.resumeSource = useLocal ? 'app' : 'history';
+    if (time > 0) this.send('resume', time);
+  }
+
+  #rememberPosition({ videoId, time, duration, ended }) {
+    const current = this.current;
+    if (!this.resumeStore || !current || !['embed', 'watch'].includes(current.mode)) return;
+    // Wait until the resume decision for this video so its saved point survives the first seconds.
+    if (!YOUTUBE_VIDEO_ID.test(String(videoId || '')) || videoId !== current.id || this.resumedId !== videoId) return;
+    const seconds = Math.floor(Number(time) || 0);
+    const length = Number(duration) || 0;
+    if (ended || (length > 0 && seconds > length - 20)) {
+      this.resumeStore.delete(videoId);
+      return;
+    }
+    if (seconds < 10) return;
+    const entry = { time: seconds, at: Date.now() };
+    if (this.historyKnown) entry.history = Number(this.resumeTimes?.[videoId]) || null;
+    this.resumeStore.set(videoId, entry);
   }
 
   clear() {
@@ -267,6 +323,14 @@ export class PlaybackController {
       this.hooks.setVolume?.(Number(payload.volume), Boolean(payload.muted));
       return;
     }
+    if (type === 'resume-change') {
+      this.hooks.toast(`Fortgesetzt bei ${formatTime(payload.time)} · ${this.resumeSource === 'app' ? 'zuletzt in FloatingYT' : 'YouTube-Verlauf'}`);
+      return;
+    }
+    if (type === 'position') {
+      this.#rememberPosition(payload);
+      return;
+    }
     if (type === 'seek-change') {
       const delta = Math.round(Number(payload.delta) || 0);
       if (!delta) return;
@@ -326,6 +390,10 @@ export class PlaybackController {
     if ([1, 3].includes(status.state)) {
       this.lastBlockedId = '';
     }
+    if (status.state === 1) {
+      this.playingId = this.current.id;
+      this.#maybeResume();
+    }
     if (status.state === 0 && isPersonalPlaylist(this.current.list)) {
       if (!this.#stepQueue(true)) this.hooks.toast('Liste zu Ende');
       return;
@@ -370,6 +438,10 @@ export class PlaybackController {
       this.#rememberYouTubeTitle(status.videoId || this.current.id, status.title);
     }
     this.#publishYouTubeQueue();
+    if (status.state === 1) {
+      this.playingId = this.current.id;
+      this.#maybeResume();
+    }
   }
 
   #fallbackToWatch(code, id, reason = '') {

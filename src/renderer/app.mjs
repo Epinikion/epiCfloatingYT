@@ -1,5 +1,6 @@
 import { isSupportedVideoLink } from '../shared/twitch-url.mjs';
 import { PlaybackController } from './playback-controller.mjs';
+import { ResumeStore } from './resume-store.mjs';
 import { SearchController } from './search-controller.mjs';
 import { AmbientLight, ResizeSmoother } from './visual-effects.mjs';
 
@@ -8,7 +9,7 @@ const QUALITY_LABELS = {
   hd1080: '1080p', hd720: '720p', large: '480p', medium: '360p', small: '240p', tiny: '144p', auto: 'Auto',
 };
 const BROWSER_LABELS = {
-  '': 'aus', firefox: 'Firefox', chrome: 'Chrome', edge: 'Edge', brave: 'Brave',
+  '': 'aus', file: 'Cookie-Datei', firefox: 'Firefox', chrome: 'Chrome', edge: 'Edge', brave: 'Brave',
   vivaldi: 'Vivaldi', opera: 'Opera', chromium: 'Chromium',
 };
 const BOOST_OPTIONS = [
@@ -18,6 +19,11 @@ const BOOST_OPTIONS = [
   { value: 3, label: '300 %' },
 ];
 
+// Storage can be blocked; resuming then simply has nothing remembered.
+function localStorageOrNull() {
+  try { return window.localStorage; } catch { return null; }
+}
+
 class FloatingApp {
   constructor(api) {
     this.api = api;
@@ -26,7 +32,7 @@ class FloatingApp {
       'video-title', 'ambient', 'resize-snapshot', 'volume', 'volume-value', 'volume-toggle',
       'help', 'help-overlay', 'help-dialog', 'help-close', 'welcome-help',
       'search', 'welcome', 'search-results', 'search-feedback', 'search-clear', 'drop-overlay',
-      'playlist', 'playlist-panel', 'playlist-list', 'playlist-count', 'playlist-close',
+      'playlist', 'playlist-panel', 'playlist-list', 'playlist-count', 'playlist-close', 'login-status', 'login-action',
     ].map((id) => [id, document.getElementById(id)]));
     this.titleText = this.elements['video-title'].querySelector('span');
     this.ambient = new AmbientLight(this.elements.ambient.querySelector('canvas'));
@@ -83,6 +89,7 @@ class FloatingApp {
       baseUrl: state.baseUrl,
       caption: this.caption,
       soundBoost: this.soundBoost,
+      resumeStore: new ResumeStore(localStorageOrNull()),
       hooks: {
         toast: (text) => this.toast(text),
         setEmpty: (empty) => this.setEmpty(empty),
@@ -96,8 +103,10 @@ class FloatingApp {
         setLocalDrag: (active) => this.#setLocalDrag(active),
         openLocal: (result) => this.#openLocalResult(result),
         openMenu: () => this.toggleMenu(true),
+        setAccount: (account) => this.#paintAccount(account),
       },
     });
+    void this.#checkAccount();
     if (this.pendingShortcut) {
       const pending = this.pendingShortcut;
       this.pendingShortcut = null;
@@ -154,6 +163,7 @@ class FloatingApp {
   #bindUi() {
     const input = this.elements['url-input'];
     this.searchController.bind();
+    this.elements['login-action'].addEventListener('click', () => void this.#chooseCookieFile());
 
     document.getElementById('close').addEventListener('click', () => this.api.close());
     document.getElementById('minimize').addEventListener('click', () => this.api.minimize());
@@ -486,6 +496,57 @@ class FloatingApp {
     for (const panel of document.querySelectorAll('[data-help-panel]')) panel.hidden = panel.dataset.helpPanel !== name;
   }
 
+  // The cookie login is only proven by reading the signed-in YouTube history.
+  async #checkAccount(refresh = false) {
+    const browser = this.cookieBrowser;
+    if (!browser) {
+      this.#paintAccount({ status: 'off' });
+      return null;
+    }
+    this.#paintAccount({ status: 'checking', browser });
+    let account;
+    try { account = await this.api.youtubeAccount(refresh); } catch { account = { status: 'error', browser, error: 'Login nicht prüfbar' }; }
+    if (browser !== this.cookieBrowser) return null;
+    this.#paintAccount(account);
+    return account;
+  }
+
+  #paintAccount(account) {
+    const state = account?.status || 'off';
+    if (state !== 'off' && account?.browser && account.browser !== this.cookieBrowser) return;
+    const fromFile = this.cookieBrowser === 'file';
+    const label = BROWSER_LABELS[this.cookieBrowser] || this.cookieBrowser;
+    const texts = {
+      off: 'Aus · ohne persönliche Listen und YouTube-Fortsetzung',
+      checking: `Prüfe YouTube-Login über ${label} …`,
+      ok: `Angemeldet über ${label} · Videos setzen an der Stelle aus dem YouTube-Verlauf fort`,
+      'signed-out': fromFile ? 'Cookie-Datei abgelaufen – neu exportieren' : `${label} ist nicht bei YouTube angemeldet`,
+      error: `${label}: ${account?.error || 'Login nicht prüfbar'}`,
+    };
+    const status = this.elements['login-status'];
+    status.textContent = texts[state] || texts.off;
+    status.dataset.state = state;
+    this.elements.settings.dataset.login = state;
+    const action = this.elements['login-action'];
+    action.hidden = !fromFile || state === 'checking';
+    action.textContent = state === 'ok' ? 'Andere Datei' : 'Datei wählen';
+  }
+
+  // Chrome encrypts its cookies for itself, so they arrive as an exported cookies.txt.
+  async #chooseCookieFile() {
+    let result;
+    try { result = await this.api.importCookieFile(); } catch { result = { error: 'Datei nicht lesbar' }; }
+    if (result?.canceled) return;
+    if (result?.error) {
+      this.toast(`Cookie-Datei: ${result.error}`);
+      return;
+    }
+    this.cookieBrowser = result.browser;
+    this.#paintAccount(result.account);
+    this.toast(result.account?.status === 'ok' ? 'Cookie-Datei übernommen · YouTube-Login gültig' : 'Cookie-Datei übernommen, aber kein gültiger Login');
+    await this.playback?.refreshPersonalList();
+  }
+
   async #refreshMenu() {
     const [info, browsers] = await Promise.all([this.playback?.requestInfo(), this.api.cookieBrowsers()]);
     if (info) {
@@ -522,11 +583,23 @@ class FloatingApp {
       button.addEventListener('click', async () => {
         for (const child of container.children) child.classList.remove('active');
         button.classList.add('active');
+        if (command === 'cookie' && item.value === 'file') {
+          await this.#chooseCookieFile();
+          await this.#refreshMenu();
+          return;
+        }
         if (command === 'cookie') {
           this.cookieBrowser = await this.api.setCookieBrowser(item.value);
           await this.#refreshMenu();
-          if (this.cookieBrowser) await this.playback?.refreshPersonalList();
-          else this.toast('Ohne Browser-Cookies');
+          if (!this.cookieBrowser) {
+            this.#paintAccount({ status: 'off' });
+            this.toast('Ohne Browser-Cookies');
+            return;
+          }
+          const account = await this.#checkAccount(true);
+          if (account?.status === 'ok') this.toast(`YouTube-Login über ${BROWSER_LABELS[this.cookieBrowser]} gültig`);
+          else if (account?.status === 'signed-out') this.toast(`${BROWSER_LABELS[this.cookieBrowser]}: nicht bei YouTube angemeldet`);
+          await this.playback?.refreshPersonalList();
           return;
         }
         let selectedValue = item.value;

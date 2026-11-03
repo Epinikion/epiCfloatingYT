@@ -232,6 +232,19 @@ body.drop-active #drop-overlay {
 #toolbar button:hover { color: #e11d48; background: transparent; }
 #toolbar #playlist.active { color: #e11d48; }
 #pin.off { opacity: .35; }
+#toolbar #settings { position: relative; }
+#settings[data-login="ok"]::after, #settings[data-login="signed-out"]::after, #settings[data-login="error"]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 1.5px rgba(10,10,12,.85);
+}
+#settings[data-login="signed-out"]::after, #settings[data-login="error"]::after { background: #f59e0b; }
 .playlist-only { display: none !important; }
 body.has-playlist .playlist-only { display: grid !important; }
 .queue-list-only { display: none !important; }
@@ -355,6 +368,11 @@ body.has-queue-list .queue-list-only { display: grid !important; }
 #settings-menu button:hover { border-color: rgba(255,255,255,.6); color: #fff; }
 #settings-menu button.active { border-color: var(--accent); background: rgba(255,45,45,.16); color: #fff; }
 .unavailable { color: #6a6a70; font-size: 11px; }
+#login-status { color: #8b8b90; font-size: 11px; }
+#login-action { flex: none; white-space: nowrap; }
+#login-action[hidden] { display: none; }
+#login-status[data-state="ok"] { color: #86efac; }
+#login-status[data-state="signed-out"], #login-status[data-state="error"] { color: #fcd34d; }
 .volume-controls { flex: 1; display: grid; grid-template-columns: 32px minmax(120px,1fr) 42px; align-items: center; gap: 9px; }
 #volume-toggle { width: 32px; display: grid; place-items: center; padding: 2px 0 !important; border-color: transparent !important; }
 #volume-toggle svg { width: 17px; height: 17px; }
