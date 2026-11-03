@@ -50,3 +50,21 @@ test('turns arrow keys and J/L inside the player into ten-second seeks', () => {
     { name: 'next' },
   ]);
 });
+
+test('keeps the stored video size when Windows rounds the window up', () => {
+  const store = {
+    value: { glow: true, window: { videoWidth: 1078, videoHeight: 609, x: 0, y: 0, aspect: 16 / 9 } },
+    schedule() {},
+    flush() {},
+  };
+  const controller = new WindowController({ store });
+  controller.window = { isDestroyed: () => false, getBounds: () => ({ x: 562, y: 244, width: 1245, height: 706 }) };
+
+  controller.saveWindowState(true);
+  assert.deepEqual(store.value.window, { videoWidth: 1078, videoHeight: 609, x: 562, y: 244, aspect: 16 / 9 });
+
+  controller.resize = { target: { x: 562, y: 244, width: 1380, height: 780 } };
+  controller.endResize();
+  assert.equal(store.value.window.videoWidth, 1200);
+  assert.equal(store.value.window.videoHeight, 678);
+});

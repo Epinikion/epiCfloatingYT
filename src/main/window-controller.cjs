@@ -114,9 +114,18 @@ class WindowController {
     window.once('ready-to-show', () => window.show());
     if (startUrl) window.webContents.once('did-finish-load', () => this.send('app:shortcut', { name: 'load-url', url: startUrl }));
 
-    window.on('will-resize', () => this.#beginVisualResize());
+    window.on('will-resize', () => {
+      if (!this.resize) this.nativeResize = true;
+      this.#beginVisualResize();
+    });
     window.on('resize', () => this.#scheduleStateSave());
-    window.on('resized', () => { if (!this.resize) this.#endVisualResize(); });
+    window.on('resized', () => {
+      if (this.resize) return;
+      this.#endVisualResize();
+      if (!this.nativeResize) return;
+      this.nativeResize = false;
+      this.saveWindowState(false, { size: this.window.getBounds() });
+    });
     window.on('move', () => this.#scheduleStateSave());
     window.on('close', () => this.saveWindowState(true));
     window.on('closed', () => {
@@ -192,16 +201,32 @@ class WindowController {
     return false;
   }
 
-  saveWindowState(immediate = false) {
+  // Windows rounds a window to whole device pixels at fractional scaling, so
+  // getBounds() can come back a few pixels larger than requested. Deriving the
+  // stored size from it on every save made the window grow on each restart;
+  // the size is therefore only stored from an actual resize.
+  saveWindowState(immediate = false, { size = null } = {}) {
     if (!this.window || this.window.isDestroyed() || this.fullscreen || this.restoreBounds) return;
     const bounds = this.window.getBounds();
-    const scale = outerScale(this.store.value.glow);
-    this.store.value.window.videoWidth = Math.max(90, Math.round(bounds.width / scale));
-    this.store.value.window.videoHeight = Math.max(90, Math.round(bounds.height / scale));
+    if (size) this.#storeVideoSize(size);
     this.store.value.window.x = bounds.x;
     this.store.value.window.y = bounds.y;
     if (immediate) this.store.flush();
     else this.store.schedule();
+  }
+
+  #storeVideoSize({ width, height }) {
+    const scale = outerScale(this.store.value.glow);
+    this.store.value.window.videoWidth = Math.max(90, Math.round(width / scale));
+    this.store.value.window.videoHeight = Math.max(90, Math.round(height / scale));
+  }
+
+  #windowSize() {
+    const scale = outerScale(this.store.value.glow);
+    return {
+      width: Math.round(this.store.value.window.videoWidth * scale),
+      height: Math.round(this.store.value.window.videoHeight * scale),
+    };
   }
 
   #scheduleStateSave() {
@@ -218,15 +243,8 @@ class WindowController {
   toggleGlow() {
     if (!this.window || this.fullscreen) return;
     const bounds = this.window.getBounds();
-    const oldScale = outerScale(this.store.value.glow);
-    const videoWidth = Math.max(90, Math.round(bounds.width / oldScale));
-    const videoHeight = Math.max(90, Math.round(bounds.height / oldScale));
     this.store.value.glow = !this.store.value.glow;
-    this.store.value.window.videoWidth = videoWidth;
-    this.store.value.window.videoHeight = videoHeight;
-    const newScale = outerScale(this.store.value.glow);
-    const width = Math.round(videoWidth * newScale);
-    const height = Math.round(videoHeight * newScale);
+    const { width, height } = this.#windowSize();
     const minimum = minimumWindowSize(this.store.value.window.aspect, this.store.value.glow);
     this.window.setResizable(!this.store.value.glow);
     this.window.setMinimumSize(minimum.width, minimum.height);
@@ -248,9 +266,7 @@ class WindowController {
     }
     const workArea = this.screen.getDisplayMatching(source).workArea;
     const target = reshapeForAspect(source, next, this.store.value.glow, workArea);
-    const scale = outerScale(this.store.value.glow);
-    this.store.value.window.videoWidth = Math.max(90, Math.round(target.width / scale));
-    this.store.value.window.videoHeight = Math.max(90, Math.round(target.height / scale));
+    this.#storeVideoSize(target);
     if (this.fullscreen) this.restoreBounds = target;
     else {
       const minimum = minimumWindowSize(next, this.store.value.glow);
@@ -272,8 +288,7 @@ class WindowController {
     this.#setBounds({
       x: this.drag.bounds.x + x - this.drag.x,
       y: this.drag.bounds.y + y - this.drag.y,
-      width: this.drag.bounds.width,
-      height: this.drag.bounds.height,
+      ...this.#windowSize(),
     });
   }
 
@@ -306,14 +321,16 @@ class WindowController {
       glow: true,
       lockAspect: this.store.value.lockAspect,
     });
+    this.resize.target = target;
     this.#setBounds(target);
   }
 
   endResize() {
     if (!this.resize) return;
+    const { target } = this.resize;
     this.resize = null;
     this.#endVisualResize();
-    this.saveWindowState();
+    this.saveWindowState(false, { size: target });
   }
 
   toggleFullscreen() {
