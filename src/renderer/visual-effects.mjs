@@ -44,6 +44,17 @@ export function nextTone(previous, area, { light, dark }) {
   return darkGlyphs > lightGlyphs * SWITCH_MARGIN ? 'light' : 'dark';
 }
 
+// True when every pixel of a BGRA frame is (nearly) black, as protected video
+// reads back where the GPU path withholds it.
+export function isBlankFrame(frame, limit = 6) {
+  if (!frame?.pixels) return false;
+  const pixels = new Uint8Array(frame.pixels);
+  for (let offset = 0; offset < pixels.length; offset += 4) {
+    if (pixels[offset] > limit || pixels[offset + 1] > limit || pixels[offset + 2] > limit) return false;
+  }
+  return pixels.length > 0;
+}
+
 export const GLYPH_LUMINANCE = Object.freeze({
   button: { light: 0.604, dark: 0.012 },
   title: { light: 0.757, dark: 0.007 },

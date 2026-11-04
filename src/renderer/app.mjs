@@ -1,8 +1,9 @@
+import { MAGENTA_HOME } from '../shared/magenta-url.mjs';
 import { isSupportedVideoLink } from '../shared/twitch-url.mjs';
 import { PlaybackController } from './playback-controller.mjs';
 import { ResumeStore } from './resume-store.mjs';
 import { SearchController } from './search-controller.mjs';
-import { AmbientLight, GLYPH_LUMINANCE, ResizeSmoother, areaLuminance, nextTone } from './visual-effects.mjs';
+import { AmbientLight, GLYPH_LUMINANCE, ResizeSmoother, areaLuminance, isBlankFrame, nextTone } from './visual-effects.mjs';
 
 const QUALITY_LABELS = {
   highres: '4320p', hd2880: '2880p', hd2160: '2160p', hd1440: '1440p',
@@ -25,13 +26,15 @@ function localStorageOrNull() {
   try { return window.localStorage; } catch { return null; }
 }
 
+const BLANK_FRAMES_FOR_PROTECTED = 25;
+
 class FloatingApp {
   constructor(api) {
     this.api = api;
     this.elements = Object.fromEntries([
       'player', 'stage', 'toolbar', 'url-input', 'pin', 'settings-menu', 'settings', 'toast',
       'video-title', 'ambient', 'resize-snapshot', 'volume', 'volume-value', 'volume-toggle',
-      'help', 'help-overlay', 'help-dialog', 'help-close', 'welcome-help',
+      'help', 'help-overlay', 'help-dialog', 'help-close', 'welcome-help', 'welcome-magenta',
       'search', 'welcome', 'search-results', 'search-feedback', 'search-clear', 'drop-overlay',
       'playlist', 'playlist-panel', 'playlist-list', 'playlist-count', 'playlist-close', 'login-status', 'login-action',
     ].map((id) => [id, document.getElementById(id)]));
@@ -51,6 +54,7 @@ class FloatingApp {
     this.soundBoost = 1;
     this.ghost = false;
     this.toolbarTones = { buttons: 'dark', title: 'dark' };
+    this.blankFrames = 0;
     this.menuMuted = false;
     this.volumeTimer = null;
     this.title = '';
@@ -111,6 +115,7 @@ class FloatingApp {
       },
     });
     void this.#checkAccount();
+    void this.#watchWidevine();
     if (this.pendingShortcut) {
       const pending = this.pendingShortcut;
       this.pendingShortcut = null;
@@ -130,6 +135,16 @@ class FloatingApp {
   #bindMainEvents() {
     this.api.onAmbientFrame((frame) => {
       const empty = document.body.classList.contains('empty');
+      // Copy-protected video may read back black, depending on the channel and
+      // the GPU path. Glow and toolbar tones pause only after about two seconds
+      // of blank frames, so a dark scene does not switch them off.
+      this.blankFrames = this.playback?.current?.mode === 'magenta' && !empty && isBlankFrame(frame) ? this.blankFrames + 1 : 0;
+      const protectedVideo = this.blankFrames >= BLANK_FRAMES_FOR_PROTECTED;
+      document.body.classList.toggle('protected-video', protectedVideo);
+      if (protectedVideo) {
+        this.#paintToolbarTones(frame, true);
+        return;
+      }
       if (this.glow) this.ambient.update(frame, empty);
       this.#paintToolbarTones(frame, empty);
     });
@@ -189,6 +204,11 @@ class FloatingApp {
     this.elements.settings.addEventListener('click', (event) => { event.stopPropagation(); this.toggleMenu(); });
     this.elements.help.addEventListener('click', (event) => { event.stopPropagation(); this.toggleHelp(); });
     this.elements['welcome-help'].addEventListener('click', () => this.toggleHelp(true));
+    this.elements['welcome-magenta'].addEventListener('click', () => {
+      if (!this.playback?.load(MAGENTA_HOME)) return;
+      this.searchController.reset();
+      this.toggleSearch(false);
+    });
     this.elements['help-close'].addEventListener('click', () => this.toggleHelp(false));
     this.elements['help-overlay'].addEventListener('click', (event) => { if (event.target === this.elements['help-overlay']) this.toggleHelp(false); });
     for (const tab of document.querySelectorAll('[data-help-tab]')) tab.addEventListener('click', () => this.#selectHelpTab(tab.dataset.helpTab));
@@ -533,6 +553,17 @@ class FloatingApp {
       tab.tabIndex = selected ? 0 : -1;
     }
     for (const panel of document.querySelectorAll('[data-help-panel]')) panel.hidden = panel.dataset.helpPanel !== name;
+  }
+
+  // The Widevine module may still download on the first start of castLabs Electron.
+  async #watchWidevine() {
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      let status = 'missing';
+      try { status = await this.api.widevineStatus(); } catch {}
+      if (this.playback) this.playback.widevine = status;
+      if (status !== 'pending') return;
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
   }
 
   // The cookie login is only proven by reading the signed-in YouTube history.

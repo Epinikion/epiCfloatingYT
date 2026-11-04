@@ -27,6 +27,23 @@ app.setAppUserModelId('org.nerdwg.floatingyt');
 let controller = null;
 let playerServer = null;
 let store = null;
+let widevine = 'pending';
+
+// castLabs Electron fetches the Widevine module that MagentaTV needs; plain
+// Electron has no `components` and therefore no protected playback.
+function prepareWidevine() {
+  const { components } = require('electron');
+  if (!components?.whenReady) {
+    widevine = 'missing';
+    return;
+  }
+  components.whenReady()
+    .then(() => {
+      const ready = Object.values(components.status() || {}).some((entry) => /widevine/i.test(entry?.title || '') && entry.version);
+      widevine = ready ? 'ready' : 'missing';
+    })
+    .catch(() => { widevine = 'missing'; });
+}
 
 // Google and YouTube treat the default Electron user agent as an unknown browser.
 function usePlainUserAgent(target) {
@@ -53,6 +70,7 @@ function findStartUrl(argv) {
 }
 
 function registerIpc({ resolver, search, metadata, cookieFile }) {
+  ipcMain.handle('app:widevine', () => widevine);
   ipcMain.handle('app:get-state', () => ({
     ...store.value,
     baseUrl: playerServer.baseUrl,
@@ -116,6 +134,7 @@ function registerIpc({ resolver, search, metadata, cookieFile }) {
   ipcMain.on('window:resize-start', (_event, payload) => controller?.startResize(payload || {}));
   ipcMain.on('window:resize-move', (_event, payload) => controller?.moveResize(payload || {}));
   ipcMain.on('window:resize-end', () => controller?.endResize());
+  ipcMain.on('guest:editing', (event, editing) => controller?.setGuestEditing(event.sender, editing === true));
 }
 
 if (!app.requestSingleInstanceLock()) {
@@ -131,6 +150,7 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.whenReady().then(async () => {
+    prepareWidevine();
     store = new StateStore(path.join(app.getPath('userData'), 'state.json'));
     const cookieFile = path.join(app.getPath('userData'), 'youtube-cookies.txt');
     const resolver = new MediaResolver({ cookieBrowser: () => store.value.cookieBrowser, cookieFile: () => cookieFile });

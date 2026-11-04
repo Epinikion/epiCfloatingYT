@@ -1,5 +1,6 @@
 import { buildTwitchUrl, parseTwitchInput } from '../shared/twitch-url.mjs';
 import { buildEmbedUrl, buildWatchUrl, isPersonalPlaylist, parseYouTubeInput } from '../shared/youtube-url.mjs';
+import { isMagentaHost, parseMagentaInput } from '../shared/magenta-url.mjs';
 
 const BLOCKED_ERRORS = new Set([100, 101, 150, 'timeout']);
 const LOCAL_MEDIA_ID = /^[a-f0-9]{36}$/;
@@ -52,17 +53,20 @@ export class PlaybackController {
     this.resumeTimes = null;
     this.historyKnown = false;
     this.resumeSource = '';
+    this.widevine = 'pending';
     this.playingId = '';
     this.resumedId = '';
     this.#bindPlayer();
   }
 
   load(input, options = {}) {
+    const magenta = parseMagentaInput(input);
+    if (magenta) return this.#loadMagenta(magenta);
     const twitch = parseTwitchInput(input);
     if (twitch) return this.#loadTwitch(twitch);
     const parsed = parseYouTubeInput(input);
     if (!parsed) {
-      this.hooks.toast('Kein gültiger YouTube- oder Twitch-Link');
+      this.hooks.toast('Kein gültiger YouTube-, Twitch- oder MagentaTV-Link');
       return false;
     }
     this.#beginSession();
@@ -115,6 +119,23 @@ export class PlaybackController {
     this.hooks.setQueue?.(null);
     this.hooks.setTitle(parsed.channel ? `${parsed.channel} · Twitch` : 'Twitch-Video');
     this.player.src = buildTwitchUrl(this.baseUrl, this.current);
+    this.player.focus();
+    return true;
+  }
+
+  // MagentaTV runs as its own web page; channels are picked there.
+  #loadMagenta(parsed) {
+    if (this.widevine === 'missing') {
+      this.hooks.toast('MagentaTV braucht Widevine, das hier fehlt');
+      return false;
+    }
+    this.#beginSession();
+    this.current = { mode: 'magenta', id: parsed.url, url: parsed.url, start: 0, list: null, queue: null };
+    this.hooks.setEmpty(false);
+    this.hooks.setPlaylist(false);
+    this.hooks.setQueue?.(null);
+    this.hooks.setTitle('MagentaTV');
+    this.player.src = parsed.url;
     this.player.focus();
     return true;
   }
@@ -221,6 +242,10 @@ export class PlaybackController {
       this.hooks.toast('Keine Playlist bei Twitch');
       return false;
     }
+    if (this.current.mode === 'magenta') {
+      this.hooks.toast('Sender wechselst du auf der MagentaTV-Seite');
+      return false;
+    }
     if (isPersonalPlaylist(this.current.list)) {
       if (this.#stepQueue(forward)) return true;
       this.hooks.toast('Kein weiteres Video in der Liste');
@@ -282,6 +307,11 @@ export class PlaybackController {
     });
     this.player.addEventListener('will-navigate', (event) => {
       if (!this.#isAllowedNavigation(event.url)) this.player.stop();
+    });
+    this.player.addEventListener('page-title-updated', (event) => {
+      if (this.current?.mode !== 'magenta') return;
+      const title = String(event.title || '').replace(/^MagentaTV\s*[-–]\s*/, '').trim();
+      this.hooks.setTitle((title || 'MagentaTV').slice(0, 240));
     });
   }
 
@@ -583,7 +613,8 @@ export class PlaybackController {
       if (url.origin === new URL(this.baseUrl).origin) return true;
       const host = url.hostname.toLowerCase();
       return ['youtube.com', 'youtube-nocookie.com', 'youtu.be'].some((domain) => host === domain || host.endsWith(`.${domain}`))
-        || host === 'consent.google.com' || host.endsWith('.consent.google.com');
+        || host === 'consent.google.com' || host.endsWith('.consent.google.com')
+        || isMagentaHost(host);
     } catch {
       return false;
     }

@@ -54,6 +54,7 @@ button svg { width: 15px; height: 15px; display: block; fill: none; stroke: curr
   opacity: .94;
 }
 body.glow #ambient { display: block; }
+body.protected-video #ambient { display: none; }
 
 #welcome {
   position: absolute;
@@ -77,7 +78,7 @@ body.empty #player { visibility: hidden; }
 .welcome-note { color: #666; font-size: 11px; }
 .welcome-actions { display: flex; align-items: center; gap: 12px; }
 .welcome-actions kbd { min-width: 18px; margin-right: 2px; padding: 1px 4px; font-size: 9px; }
-#welcome-help {
+#welcome-help, #welcome-magenta {
   -webkit-app-region: no-drag;
   border: 0;
   background: transparent;
@@ -86,7 +87,7 @@ body.empty #player { visibility: hidden; }
   font-size: 11px;
   cursor: pointer;
 }
-#welcome-help:hover { color: #ddd; text-decoration: underline; }
+#welcome-help:hover, #welcome-magenta:hover { color: #ddd; text-decoration: underline; }
 #search-box {
   -webkit-app-region: no-drag;
   width: min(88%,560px);

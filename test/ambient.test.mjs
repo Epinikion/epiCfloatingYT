@@ -72,3 +72,12 @@ test('picks the toolbar tone per area by its worst-case contrast', async () => {
   assert.equal(nextTone('light', grey, GLYPH_LUMINANCE.button), 'light');
   assert.equal(nextTone('light', null, GLYPH_LUMINANCE.button), 'light');
 });
+
+test('recognizes a frame that protected video left black', async () => {
+  const { isBlankFrame } = await import('../src/renderer/visual-effects.mjs');
+  const pixels = new Uint8Array(80 * 45 * 4).fill(3);
+  assert.equal(isBlankFrame({ width: 80, height: 45, pixels }), true);
+  pixels[4000] = 40;
+  assert.equal(isBlankFrame({ width: 80, height: 45, pixels }), false);
+  assert.equal(isBlankFrame(null), false);
+});

@@ -1,3 +1,4 @@
+import { parseMagentaInput } from './magenta-url.mjs';
 import { isHostOrSubdomain, parseStartTime, parseYouTubeInput } from './youtube-url.mjs';
 
 const VIDEO_ID = /^\d{5,12}$/;
@@ -52,5 +53,5 @@ export function buildTwitchUrl(baseUrl, { video, channel, start = 0 }) {
 }
 
 export function isSupportedVideoLink(input) {
-  return Boolean(parseYouTubeInput(input) || parseTwitchInput(input));
+  return Boolean(parseYouTubeInput(input) || parseTwitchInput(input) || parseMagentaInput(input));
 }

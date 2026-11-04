@@ -27,7 +27,8 @@ function isAllowedGuestUrl(rawUrl, localOrigin) {
     const url = new URL(rawUrl);
     if (url.origin === localOrigin) return true;
     const host = url.hostname.toLowerCase();
-    return ['youtube.com', 'youtube-nocookie.com', 'youtu.be'].some((domain) => host === domain || host.endsWith(`.${domain}`))
+    // MagentaTV, its former web player and the Telekom sign-in, as in src/shared/magenta-url.mjs.
+    return ['youtube.com', 'youtube-nocookie.com', 'youtu.be', 'magenta.tv', 'magentatv.de', 'telekom.com', 'telekom.de'].some((domain) => host === domain || host.endsWith(`.${domain}`))
       || host === 'consent.google.com'
       || host.endsWith('.consent.google.com');
   } catch {
@@ -70,6 +71,7 @@ class WindowController {
     this.ambientTick = 0;
     this.mousePassthrough = false;
     this.ghostActive = false;
+    this.guestEditing = false;
   }
 
   create(startUrl = null) {
@@ -159,6 +161,8 @@ class WindowController {
     const key = String(input.key || '').toLowerCase();
     const control = input.control || input.meta;
     if (key === 'f1' && fromGuest) { this.send('app:shortcut', { name: 'help' }); return true; }
+    // A focused text field of the page, such as a sign-in form, keeps its keys.
+    if (fromGuest && this.guestEditing && !(control && key === 'w')) return false;
     if (control && key === 'v') {
       const url = this.clipboard.readText().trim();
       if (url) this.send('app:shortcut', { name: 'load-url', url });
@@ -407,8 +411,14 @@ class WindowController {
     } catch {}
   }
 
+  setGuestEditing(sender, editing) {
+    if (sender && sender === this.guest) this.guestEditing = Boolean(editing);
+  }
+
   #attachGuest(contents) {
     this.guest = contents;
+    this.guestEditing = false;
+    contents.on('did-start-navigation', (_event, _url, _inPlace, isMainFrame) => { if (isMainFrame) this.guestEditing = false; });
     contents.on('before-input-event', (event, input) => {
       if (this.handleInput(input, true)) event.preventDefault();
     });

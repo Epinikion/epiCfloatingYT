@@ -95,3 +95,25 @@ test('restores the chosen opacity when click-through is switched off', () => {
   assert.equal(controller.ghostActive, false);
   assert.deepEqual(messages.map(({ payload }) => payload), [{ name: 'ghost', value: true }, { name: 'ghost', value: false }]);
 });
+
+test('leaves keys and paste to a focused text field of the page', () => {
+  const controller = new WindowController({ clipboard: { readText: () => 'max.mustermann' } });
+  const messages = [];
+  const guest = {};
+  let closed = 0;
+  controller.window = { close: () => { closed += 1; } };
+  controller.guest = guest;
+  controller.send = (channel, payload) => messages.push(payload);
+
+  controller.setGuestEditing({}, true);
+  assert.equal(controller.handleInput({ type: 'keyDown', key: 'k' }, true), true);
+  controller.setGuestEditing(guest, true);
+  for (const input of [{ key: 'k' }, { key: 'm' }, { key: ' ' }, { key: 'ArrowLeft' }, { key: 'v', control: true }]) {
+    assert.equal(controller.handleInput({ type: 'keyDown', ...input }, true), false, input.key);
+  }
+  assert.equal(controller.handleInput({ type: 'keyDown', key: 'w', control: true }, true), true);
+  assert.equal(closed, 1);
+  controller.setGuestEditing(guest, false);
+  assert.equal(controller.handleInput({ type: 'keyDown', key: 'k' }, true), true);
+  assert.deepEqual(messages.map(({ name }) => name), ['play-pause', 'play-pause']);
+});

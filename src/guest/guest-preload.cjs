@@ -5,6 +5,7 @@ const { contextBridge, ipcRenderer, webFrame, webUtils } = require('electron');
 const isTop = window.top === window;
 const isLocal = location.hostname === '127.0.0.1';
 const isYouTube = /(^|\.)(youtube\.com|youtube-nocookie\.com)$/i.test(location.hostname);
+const isMagenta = /(^|\.)magenta\.tv$/i.test(location.hostname);
 const send = (type, payload = {}) => ipcRenderer.sendToHost('guest-event', { type, payload });
 const EXTENSION_SOURCE = 'floatingyt-extension';
 const HOST_SOURCE = 'floatingyt-host';
@@ -239,13 +240,33 @@ async function handleYouTubeCommand(command) {
   else if (command.name === 'resume' && result) send('resume-change', result);
 }
 
+// Tells the app when a text field of the page has focus, so typing and pasting
+// reach the page instead of triggering player shortcuts.
+function installEditingReporter() {
+  const textInput = /^(text|search|email|password|tel|url|number)$/i;
+  let editing = false;
+  const update = () => {
+    const element = document.activeElement;
+    const next = Boolean(element && (element.isContentEditable
+      || /^(textarea|select)$/i.test(element.tagName)
+      || (element.tagName === 'INPUT' && textInput.test(element.type || 'text'))));
+    if (next === editing) return;
+    editing = next;
+    ipcRenderer.send('guest:editing', editing);
+  };
+  document.addEventListener('focusin', update, true);
+  document.addEventListener('focusout', () => setTimeout(update, 0), true);
+}
+
 function boot() {
   if (isTop) installDropBridge();
+  if (isTop && !isLocal) installEditingReporter();
   if (isLocal) {
     ensureLocalFilters();
     installLocalGestures();
     installLocalVideoReporter();
-  } else if (isYouTube && isTop) {
+  } else if ((isYouTube || isMagenta) && isTop) {
+    // MagentaTV has no player API; the commands fall back to its video element.
     ipcRenderer.on('guest-command', (_event, command) => void handleYouTubeCommand(command));
   }
 }

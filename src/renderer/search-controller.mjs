@@ -1,3 +1,4 @@
+import { parseMagentaInput } from '../shared/magenta-url.mjs';
 import { isSupportedVideoLink, parseTwitchInput } from '../shared/twitch-url.mjs';
 
 const SEARCH_DELAY = 260;
@@ -80,7 +81,8 @@ export class SearchController {
     this.#syncClearButton();
     const query = this.elements.input.value.trim();
     if (isSupportedVideoLink(query)) {
-      this.#feedback(`${parseTwitchInput(query) ? 'Twitch' : 'YouTube'}-Link erkannt · Enter zum Abspielen`);
+      const platform = parseMagentaInput(query) ? 'MagentaTV' : parseTwitchInput(query) ? 'Twitch' : 'YouTube';
+      this.#feedback(`${platform}-Link erkannt · Enter zum Abspielen`);
       return;
     }
     if (query.length < 2) {
