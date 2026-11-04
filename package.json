@@ -1,6 +1,6 @@
 {
   "name": "floating-yt",
-  "version": "2.6.0",
+  "version": "2.6.1",
   "description": "A focused, always-on-top YouTube player for Windows",
   "main": "src/main/index.cjs",
   "type": "commonjs",
