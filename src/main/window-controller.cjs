@@ -17,6 +17,7 @@ const AMBIENT_WIDTH = 80;
 const AMBIENT_HEIGHT = 45;
 const ASPECT_EPSILON = 0.0005;
 const SEEK_STEP = 10;
+const GHOST_OPACITY = 0.05;
 
 function isAllowedGuestUrl(rawUrl, localOrigin) {
   if (rawUrl === 'about:blank') return true;
@@ -30,6 +31,12 @@ function isAllowedGuestUrl(rawUrl, localOrigin) {
   } catch {
     return false;
   }
+}
+
+// The click-through mode fades the player while the pointer rests on the video,
+// so clicks reach the window below; it never applies while the window moves.
+function shouldGhost({ enabled, fullscreen, resizing, dragging, overVideo }) {
+  return Boolean(enabled && overVideo && !fullscreen && !resizing && !dragging);
 }
 
 function shouldPassMouseThrough({ glow, fullscreen, resizing, dragging, overWindow, overVideo }) {
@@ -59,6 +66,7 @@ class WindowController {
     this.ambientTimer = null;
     this.ambientBusy = false;
     this.mousePassthrough = false;
+    this.ghostActive = false;
   }
 
   create(startUrl = null) {
@@ -164,7 +172,7 @@ class WindowController {
     if (control && ['arrowup', 'arrowdown'].includes(key)) {
       const delta = key === 'arrowup' ? 0.05 : -0.05;
       this.store.patch((state) => { state.opacity = Math.min(1, Math.max(0.2, Number((state.opacity + delta).toFixed(2)))); });
-      this.window.setOpacity(this.store.value.opacity);
+      if (!this.ghostActive) this.window.setOpacity(this.store.value.opacity);
       this.send('app:shortcut', { name: 'toast', text: `Deckkraft ${Math.round(this.store.value.opacity * 100)} %` });
       return true;
     }
@@ -337,6 +345,23 @@ class WindowController {
     this.fullscreen ? this.leaveFullscreen() : this.enterFullscreen();
   }
 
+  setGhost(enabled) {
+    this.store.patch((state) => { state.ghost = Boolean(enabled); });
+    if (!this.store.value.ghost) this.#setGhostActive(false);
+    this.send('setting:changed', { name: 'ghost', value: this.store.value.ghost });
+    return this.store.value.ghost;
+  }
+
+  toggleGhost() {
+    return this.setGhost(!this.store.value.ghost);
+  }
+
+  #setGhostActive(active) {
+    if (!this.window || this.window.isDestroyed() || this.ghostActive === active) return;
+    this.ghostActive = active;
+    this.window.setOpacity(active ? GHOST_OPACITY : this.store.value.opacity);
+  }
+
   enterFullscreen() {
     if (!this.window || this.fullscreen) return;
     this.restoreBounds = this.window.getNormalBounds();
@@ -429,7 +454,15 @@ class WindowController {
         && pointer.y >= bounds.y && pointer.y < bounds.y + bounds.height;
       const overVideo = pointer.x >= video.x && pointer.x < video.x + video.width
         && pointer.y >= video.y && pointer.y < video.y + video.height;
-      this.#setMousePassthrough(shouldPassMouseThrough({
+      const ghost = shouldGhost({
+        enabled: this.store.value.ghost,
+        fullscreen: this.fullscreen,
+        resizing: Boolean(this.resize),
+        dragging: Boolean(this.drag),
+        overVideo,
+      });
+      this.#setGhostActive(ghost);
+      this.#setMousePassthrough(ghost || shouldPassMouseThrough({
         glow: this.store.value.glow,
         fullscreen: this.fullscreen,
         resizing: Boolean(this.resize),
@@ -475,4 +508,4 @@ class WindowController {
   }
 }
 
-module.exports = { WindowController, isAllowedGuestUrl, shouldPassMouseThrough };
+module.exports = { WindowController, isAllowedGuestUrl, shouldGhost, shouldPassMouseThrough };

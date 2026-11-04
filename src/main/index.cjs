@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('node:path');
-const { app, BrowserWindow, clipboard, dialog, ipcMain, screen, session } = require('electron');
+const { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, screen, session } = require('electron');
 const { attachAdBlocker } = require('./adblock.cjs');
 const { LocalPlayerServer } = require('./local-server.cjs');
 const { collectMediaFiles } = require('./local-media.cjs');
@@ -18,6 +18,8 @@ const GUEST_PRELOAD = path.join(ROOT, 'src', 'guest', 'guest-preload.cjs');
 const APP_PRELOAD = path.join(ROOT, 'src', 'preload', 'app-preload.cjs');
 const UI_FILE = path.join(ROOT, 'src', 'renderer', 'index.html');
 const ICON_FILE = path.join(ROOT, 'build', 'icon.png');
+// Global, because a faded click-through window receives no keys of its own.
+const GHOST_SHORTCUT = 'CommandOrControl+Alt+G';
 
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 app.setAppUserModelId('org.nerdwg.floatingyt');
@@ -96,6 +98,7 @@ function registerIpc({ resolver, search, metadata, cookieFile }) {
     store.patch((state) => { state.caption = caption(value); });
     return store.value.caption;
   });
+  ipcMain.handle('settings:set-ghost', (_event, value) => controller?.setGhost(value === true) ?? false);
   ipcMain.handle('settings:set-sound-boost', (_event, value) => {
     store.patch((state) => { state.soundBoost = soundBoost(value); });
     return store.value.soundBoost;
@@ -150,9 +153,11 @@ if (!app.requestSingleInstanceLock()) {
       baseUrl: playerServer.baseUrl,
     });
     controller.create(findStartUrl(process.argv));
+    globalShortcut.register(GHOST_SHORTCUT, () => controller?.toggleGhost());
   });
 
   app.on('window-all-closed', () => app.quit());
+  app.on('will-quit', () => globalShortcut.unregisterAll());
   app.on('before-quit', () => {
     store?.flush();
     playerServer?.close();

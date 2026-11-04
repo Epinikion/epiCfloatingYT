@@ -49,3 +49,9 @@ test('sanitizes and persists the preferred caption track', () => {
   assert.equal(sanitizeState({ caption: 'de-DE' }).caption, 'de-DE');
   assert.equal(sanitizeState({ caption: '<script>' }).caption, null);
 });
+
+test('keeps the click-through option off unless it was switched on', () => {
+  assert.equal(sanitizeState({}).ghost, false);
+  assert.equal(sanitizeState({ ghost: true }).ghost, true);
+  assert.equal(sanitizeState({ ghost: 'yes' }).ghost, false);
+});

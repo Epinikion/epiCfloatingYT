@@ -65,6 +65,7 @@ contextBridge.exposeInMainWorld('floatingApi', {
   importCookieFile: () => ipcRenderer.invoke('youtube:import-cookie-file'),
   setCaption: (caption) => ipcRenderer.invoke('settings:set-caption', caption),
   setSoundBoost: (value) => ipcRenderer.invoke('settings:set-sound-boost', value),
+  setGhost: (enabled) => ipcRenderer.invoke('settings:set-ghost', enabled === true),
   onLocalDrop: (callback) => {
     if (typeof callback !== 'function') return () => {};
     localDropListeners.add(callback);

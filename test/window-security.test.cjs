@@ -2,7 +2,7 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { WindowController, isAllowedGuestUrl, shouldPassMouseThrough } = require('../src/main/window-controller.cjs');
+const { WindowController, isAllowedGuestUrl, shouldGhost, shouldPassMouseThrough } = require('../src/main/window-controller.cjs');
 
 test('limits guest navigation to the local player, YouTube, and consent', () => {
   const origin = 'http://127.0.0.1:4321';
@@ -67,4 +67,31 @@ test('keeps the stored video size when Windows rounds the window up', () => {
   controller.endResize();
   assert.equal(store.value.window.videoWidth, 1200);
   assert.equal(store.value.window.videoHeight, 678);
+});
+
+test('fades for click-through only while the pointer rests on the video', () => {
+  const base = { enabled: true, fullscreen: false, resizing: false, dragging: false, overVideo: true };
+  assert.equal(shouldGhost(base), true);
+  assert.equal(shouldGhost({ ...base, enabled: false }), false);
+  assert.equal(shouldGhost({ ...base, overVideo: false }), false);
+  assert.equal(shouldGhost({ ...base, fullscreen: true }), false);
+  assert.equal(shouldGhost({ ...base, dragging: true }), false);
+  assert.equal(shouldGhost({ ...base, resizing: true }), false);
+});
+
+test('restores the chosen opacity when click-through is switched off', () => {
+  const store = { value: { ghost: false, opacity: 0.8 }, patch(mutator) { mutator(this.value); }, schedule() {} };
+  const controller = new WindowController({ store });
+  const opacities = [];
+  const messages = [];
+  controller.window = { isDestroyed: () => false, setOpacity: (value) => opacities.push(value) };
+  controller.send = (channel, payload) => messages.push({ channel, payload });
+
+  assert.equal(controller.toggleGhost(), true);
+  assert.deepEqual(opacities, []);
+  controller.ghostActive = true;
+  assert.equal(controller.toggleGhost(), false);
+  assert.deepEqual(opacities, [0.8]);
+  assert.equal(controller.ghostActive, false);
+  assert.deepEqual(messages.map(({ payload }) => payload), [{ name: 'ghost', value: true }, { name: 'ghost', value: false }]);
 });

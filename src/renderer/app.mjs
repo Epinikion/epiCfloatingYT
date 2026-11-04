@@ -12,6 +12,7 @@ const BROWSER_LABELS = {
   '': 'aus', file: 'Cookie-Datei', firefox: 'Firefox', chrome: 'Chrome', edge: 'Edge', brave: 'Brave',
   vivaldi: 'Vivaldi', opera: 'Opera', chromium: 'Chromium',
 };
+const GHOST_OPTIONS = [{ value: false, label: 'Aus' }, { value: true, label: 'Beim Überfahren' }];
 const BOOST_OPTIONS = [
   { value: 1, label: 'Aus' },
   { value: 1.5, label: '150 %' },
@@ -48,6 +49,7 @@ class FloatingApp {
     this.cookieBrowser = '';
     this.caption = null;
     this.soundBoost = 1;
+    this.ghost = false;
     this.menuMuted = false;
     this.volumeTimer = null;
     this.title = '';
@@ -79,6 +81,7 @@ class FloatingApp {
     this.videoRatio = Number.isFinite(state.window?.aspect) ? state.window.aspect : 16 / 9;
     this.glow = Boolean(state.glow);
     this.cookieBrowser = state.cookieBrowser || '';
+    this.ghost = Boolean(state.ghost);
     this.caption = state.caption == null ? null : String(state.caption);
     this.soundBoost = [1, 1.5, 2, 3].includes(Number(state.soundBoost)) ? Number(state.soundBoost) : 1;
     document.body.classList.toggle('glow', this.glow);
@@ -137,6 +140,11 @@ class FloatingApp {
         this.layout();
         this.toast(this.glow ? 'Randlicht: an' : 'Randlicht: aus');
       } else if (name === 'sharpen') this.toast(value ? 'Schärfung: an' : 'Schärfung: aus');
+      else if (name === 'ghost') {
+        this.ghost = Boolean(value);
+        this.toast(this.ghost ? 'Durchklicken: an · Strg+Alt+G schaltet aus' : 'Durchklicken: aus');
+        if (!this.elements['settings-menu'].hidden) void this.#refreshMenu();
+      }
     });
     this.api.onFullscreen((enabled) => {
       this.fullscreen = Boolean(enabled);
@@ -559,6 +567,7 @@ class FloatingApp {
       for (const id of ['quality-options', 'rate-options', 'caption-options']) this.#fillOptions(id, [], null, '');
     }
     this.#fillOptions('boost-options', BOOST_OPTIONS, this.soundBoost, 'boost');
+    this.#fillOptions('ghost-options', GHOST_OPTIONS, this.ghost, 'ghost');
     const cookieItems = browsers.map((browser) => ({ value: browser, label: BROWSER_LABELS[browser] || browser }));
     this.#fillOptions('cookie-options', cookieItems, this.cookieBrowser, 'cookie');
   }
@@ -583,6 +592,10 @@ class FloatingApp {
       button.addEventListener('click', async () => {
         for (const child of container.children) child.classList.remove('active');
         button.classList.add('active');
+        if (command === 'ghost') {
+          this.ghost = await this.api.setGhost(item.value);
+          return;
+        }
         if (command === 'cookie' && item.value === 'file') {
           await this.#chooseCookieFile();
           await this.#refreshMenu();
