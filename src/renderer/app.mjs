@@ -2,7 +2,7 @@ import { isSupportedVideoLink } from '../shared/twitch-url.mjs';
 import { PlaybackController } from './playback-controller.mjs';
 import { ResumeStore } from './resume-store.mjs';
 import { SearchController } from './search-controller.mjs';
-import { AmbientLight, ResizeSmoother } from './visual-effects.mjs';
+import { AmbientLight, GLYPH_LUMINANCE, ResizeSmoother, areaLuminance, nextTone } from './visual-effects.mjs';
 
 const QUALITY_LABELS = {
   highres: '4320p', hd2880: '2880p', hd2160: '2160p', hd1440: '1440p',
@@ -50,6 +50,7 @@ class FloatingApp {
     this.caption = null;
     this.soundBoost = 1;
     this.ghost = false;
+    this.toolbarTones = { buttons: 'dark', title: 'dark' };
     this.menuMuted = false;
     this.volumeTimer = null;
     this.title = '';
@@ -127,7 +128,11 @@ class FloatingApp {
   }
 
   #bindMainEvents() {
-    this.api.onAmbientFrame((frame) => this.ambient.update(frame, document.body.classList.contains('empty')));
+    this.api.onAmbientFrame((frame) => {
+      const empty = document.body.classList.contains('empty');
+      if (this.glow) this.ambient.update(frame, empty);
+      this.#paintToolbarTones(frame, empty);
+    });
     this.api.onHover((near) => { this.hoverTop = near; this.#paintToolbar(); });
     this.api.onPin((pinned) => {
       this.elements.pin.classList.toggle('off', !pinned);
@@ -322,6 +327,32 @@ class FloatingApp {
     const toastLift = Math.min(38, Math.max(22, Math.round(stageHeight * 0.045)));
     this.elements.toast.style.left = `${left + Math.round(stageWidth / 2)}px`;
     this.elements.toast.style.bottom = `${Math.round(height - top - stageHeight + timelineInset + toastLift)}px`;
+  }
+
+  // Buttons and title each follow the video area right behind them, because a
+  // broadcast often is bright on one side of the top edge and dark on the other.
+  #paintToolbarTones(frame, empty) {
+    const stage = this.elements.stage.getBoundingClientRect();
+    if (!stage.width || !stage.height) return;
+    const toolbar = this.elements.toolbar.getBoundingClientRect();
+    const buttonsEnd = document.getElementById('drag-region').getBoundingClientRect().left;
+    const title = this.titleText.getBoundingClientRect();
+    const across = (from, to) => ({
+      left: (from - stage.left) / stage.width,
+      right: (Math.min(to, stage.right) - stage.left) / stage.width,
+      top: 0,
+      bottom: toolbar.height / stage.height,
+    });
+    const tones = { buttons: 'dark', title: 'dark' };
+    if (!empty) {
+      tones.buttons = nextTone(this.toolbarTones.buttons, areaLuminance(frame, across(toolbar.left, buttonsEnd)), GLYPH_LUMINANCE.button);
+      tones.title = title.width
+        ? nextTone(this.toolbarTones.title, areaLuminance(frame, across(Math.max(title.left, buttonsEnd), title.right)), GLYPH_LUMINANCE.title)
+        : this.toolbarTones.title;
+    }
+    this.toolbarTones = tones;
+    document.body.classList.toggle('toolbar-on-light', tones.buttons === 'light');
+    document.body.classList.toggle('title-on-light', tones.title === 'light');
   }
 
   setEmpty(empty) {

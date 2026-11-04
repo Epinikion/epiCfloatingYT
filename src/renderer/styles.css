@@ -228,8 +228,13 @@ body.drop-active #drop-overlay {
   background: transparent;
   color: #ccc;
   cursor: pointer;
+  /* Fades between the light and dark tone; hover reacts faster. */
+  transition: color 300ms ease;
 }
-#toolbar button:hover { color: #e11d48; background: transparent; }
+#toolbar button:hover { color: #e11d48; background: transparent; transition-duration: 120ms; }
+/* Dark buttons and title over a bright top edge of the video. */
+body.toolbar-on-light #toolbar button:not(:hover) { color: #1c1c20; }
+body.title-on-light #video-title span { color: #141417; }
 #toolbar #playlist.active { color: #e11d48; }
 #pin.off { opacity: .35; }
 #toolbar #settings { position: relative; }
@@ -259,7 +264,7 @@ body.has-queue-list .queue-list-only { display: grid !important; }
   -webkit-mask-image: linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 12px), transparent);
   mask-image: linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 12px), transparent);
 }
-#video-title span { display: inline-block; white-space: nowrap; color: #e2e2e6; font-size: 11px; text-shadow: 0 1px 3px rgba(0,0,0,.9); }
+#video-title span { display: inline-block; white-space: nowrap; color: #e2e2e6; font-size: 11px; transition: color 300ms ease; }
 #video-title.scroll span { animation: title-scroll var(--title-duration, 9s) linear infinite alternate; }
 @keyframes title-scroll { 0%,14% { transform: translateX(0); } 86%,100% { transform: translateX(calc(-1 * var(--title-shift, 0px))); } }
 

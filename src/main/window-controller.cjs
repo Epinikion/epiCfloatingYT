@@ -13,6 +13,8 @@ const {
 const HOVER_HEIGHT = 40;
 const POINTER_INTERVAL = 60;
 const AMBIENT_INTERVAL = 80;
+// Without the glow, frames only steer the toolbar colors and arrive less often.
+const TONE_ONLY_EVERY = 5;
 const AMBIENT_WIDTH = 80;
 const AMBIENT_HEIGHT = 45;
 const ASPECT_EPSILON = 0.0005;
@@ -65,6 +67,7 @@ class WindowController {
     this.hoverTimer = null;
     this.ambientTimer = null;
     this.ambientBusy = false;
+    this.ambientTick = 0;
     this.mousePassthrough = false;
     this.ghostActive = false;
   }
@@ -491,7 +494,8 @@ class WindowController {
   }
 
   async #captureAmbient() {
-    if (this.ambientBusy || !this.store.value.glow || this.fullscreen) return;
+    if (this.ambientBusy || this.fullscreen) return;
+    if (!this.store.value.glow && (this.ambientTick = (this.ambientTick + 1) % TONE_ONLY_EVERY) !== 0) return;
     if (!this.window || this.window.isMinimized() || !this.window.isVisible() || !this.guest || this.guest.isDestroyed()) return;
     this.ambientBusy = true;
     try {

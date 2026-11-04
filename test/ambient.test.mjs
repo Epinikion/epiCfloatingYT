@@ -47,3 +47,28 @@ test('preserves black bars instead of stretching video content across them', () 
   assert.equal(drawCalls[0].length, 5, 'ambient rendering must use the complete captured frame');
   assert.deepEqual(drawCalls[0].slice(1), [0, 0, 80, 45]);
 });
+
+test('picks the toolbar tone per area by its worst-case contrast', async () => {
+  const { GLYPH_LUMINANCE, areaLuminance, nextTone } = await import('../src/renderer/visual-effects.mjs');
+  // Top rows bright on the left half and dark on the right, like a news overlay.
+  const width = 80;
+  const height = 45;
+  const pixels = new Uint8Array(width * height * 4);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) pixels.fill(y < 3 && x < 40 ? 240 : 10, (y * width + x) * 4, (y * width + x) * 4 + 4);
+  }
+  const frame = { width, height, pixels };
+  const leftArea = areaLuminance(frame, { left: 0, right: 0.25, top: 0, bottom: 0.06 });
+  const rightArea = areaLuminance(frame, { left: 0.6, right: 1, top: 0, bottom: 0.06 });
+  assert.ok(leftArea.low > 0.8 && leftArea.high > 0.8);
+  assert.ok(rightArea.high < 0.01);
+  assert.equal(areaLuminance({ width, height, pixels: new Uint8Array(10) }), null);
+
+  assert.equal(nextTone('dark', leftArea, GLYPH_LUMINANCE.button), 'light');
+  assert.equal(nextTone('light', rightArea, GLYPH_LUMINANCE.button), 'dark');
+  // A mid-grey background reads about equally in both tones, so the tone stays.
+  const grey = { low: 0.14, high: 0.16 };
+  assert.equal(nextTone('dark', grey, GLYPH_LUMINANCE.button), 'dark');
+  assert.equal(nextTone('light', grey, GLYPH_LUMINANCE.button), 'light');
+  assert.equal(nextTone('light', null, GLYPH_LUMINANCE.button), 'light');
+});
