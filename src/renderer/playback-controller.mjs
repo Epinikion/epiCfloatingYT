@@ -357,6 +357,10 @@ export class PlaybackController {
     if (type === 'fullscreen-toggle') return this.api.toggleFullscreen();
     if (type === 'fullscreen-leave') return this.api.leaveFullscreen();
     if (type === 'history-back') { this.back(); return; }
+    if (type === 'magenta-zap') {
+      if (this.current?.mode === 'magenta') this.hooks.channelLoading?.(true, payload.forward ? 'Nächster Sender' : 'Vorheriger Sender');
+      return;
+    }
     if (type === 'magenta-video') {
       if (this.current?.mode === 'magenta') this.hooks.channelLoading?.(payload.state === 'loading');
       return;

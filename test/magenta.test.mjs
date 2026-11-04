@@ -94,7 +94,7 @@ test('passes up and down to MagentaTV and maps back keys to going back', () => {
   assert.equal(controller.handleInput({ type: 'keyDown', key: 'ArrowLeft', alt: true }, true), true);
   url = 'https://www.youtube.com/watch?v=aqz-KE-bpKQ';
   assert.equal(controller.handleInput({ type: 'keyDown', key: 'ArrowUp' }, true), true);
-  assert.deepEqual(messages, ['back', 'back', 'volume-step']);
+  assert.deepEqual(messages, ['channel-step', 'channel-step', 'back', 'back', 'volume-step']);
 });
 
 test('opens the guide when the page reports the mouse back button', async () => {
@@ -153,4 +153,23 @@ test('keeps panels over the welcome drag area clickable', async () => {
   const { readFile } = await import('node:fs/promises');
   const styles = await readFile(new URL('../src/renderer/styles.css', import.meta.url), 'utf8');
   assert.match(styles, /#guide-panel, #playlist-panel, #settings-menu \{ -webkit-app-region: no-drag; \}/);
+});
+
+test('covers the page as soon as a player channel button is pressed', async () => {
+  const listeners = new Map();
+  const loading = [];
+  const player = { src: '', focus() {}, send() {}, addEventListener: (type, listener) => listeners.set(type, listener) };
+  const controller = new PlaybackController({
+    player,
+    baseUrl: 'http://127.0.0.1:3210',
+    api: {},
+    hooks: { toast() {}, setEmpty() {}, setPlaylist() {}, setQueue() {}, setTitle() {}, openMenu() {}, channelLoading: (...args) => loading.push(args) },
+  });
+  controller.load('https://www.magenta.tv/streamen-tv/zdf/zdf');
+  for (const forward of [true, false]) listeners.get('ipc-message')({ channel: 'guest-event', args: [{ type: 'magenta-zap', payload: { forward } }] });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(loading, [[true], [true, 'Nächster Sender'], [true, 'Vorheriger Sender']]);
+  const { readFile } = await import('node:fs/promises');
+  const preload = await readFile(new URL('../src/guest/guest-preload.cjs', import.meta.url), 'utf8');
+  assert.match(preload, /closest\?\.\('#PLAYER-NEXT-CHANNEL, #PLAYER-PREVIOUS-CHANNEL'\)/);
 });

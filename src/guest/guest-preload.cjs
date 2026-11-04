@@ -283,6 +283,11 @@ function installMagentaVideoReporter() {
   const report = (state) => () => send('magenta-video', { state });
   for (const name of ['loadstart', 'waiting', 'emptied']) document.addEventListener(name, report('loading'), true);
   document.addEventListener('playing', report('playing'), true);
+  // The player's own channel buttons switch before the video reports loading.
+  document.addEventListener('pointerdown', (event) => {
+    const button = event.target?.closest?.('#PLAYER-NEXT-CHANNEL, #PLAYER-PREVIOUS-CHANNEL');
+    if (button) send('magenta-zap', { forward: button.id === 'PLAYER-NEXT-CHANNEL' });
+  }, true);
 }
 
 function boot() {

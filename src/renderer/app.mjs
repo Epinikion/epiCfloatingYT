@@ -815,6 +815,7 @@ class FloatingApp {
       case 'search': this.toggleSearch(true); break;
       case 'help': this.toggleHelp(); break;
       case 'guide': this.toggleGuide(); break;
+      case 'channel-step': this.#setChannelLoading(true, message.forward ? 'Nächster Sender' : 'Vorheriger Sender'); break;
       case 'escape':
         if (this.guidePanel.isOpen()) this.toggleGuide(false);
         else if (!this.elements['help-overlay'].hidden) this.toggleHelp(false);

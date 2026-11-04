@@ -166,8 +166,12 @@ class WindowController {
     if (key === 'f1' && fromGuest) { this.send('app:shortcut', { name: 'help' }); return true; }
     // A focused text field of the page, such as a sign-in form, keeps its keys.
     if (fromGuest && this.guestEditing && !(control && key === 'w')) return false;
-    // MagentaTV zaps channels with its own up and down keys.
-    if (fromGuest && !control && !input.alt && !input.shift && ['arrowup', 'arrowdown'].includes(key) && this.#guestIsMagenta()) return false;
+    // MagentaTV zaps channels with its own up and down keys. The app covers the
+    // page right away, before MagentaTV's loading spinner can show.
+    if (fromGuest && !control && !input.alt && !input.shift && ['arrowup', 'arrowdown'].includes(key) && this.#guestIsMagenta()) {
+      this.send('app:shortcut', { name: 'channel-step', forward: key === 'arrowup' });
+      return false;
+    }
     if (fromGuest && ((key === 'backspace' && !control && !input.alt) || (input.alt && key === 'arrowleft'))) {
       this.send('app:shortcut', { name: 'back' });
       return true;
