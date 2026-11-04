@@ -1,5 +1,5 @@
-import { MAGENTA_TV_PAGE } from '../shared/magenta-url.mjs';
 import { isSupportedVideoLink } from '../shared/twitch-url.mjs';
+import { GuidePanel } from './guide-panel.mjs';
 import { PlaybackController } from './playback-controller.mjs';
 import { ResumeStore } from './resume-store.mjs';
 import { SearchController } from './search-controller.mjs';
@@ -64,6 +64,22 @@ class FloatingApp {
     this.dropLeaveTimer = null;
     this.playlistItems = [];
     this.playlistIndex = -1;
+    this.guidePanel = new GuidePanel({
+      elements: {
+        panel: document.getElementById('guide-panel'),
+        list: document.getElementById('guide-list'),
+        search: document.getElementById('guide-search'),
+        count: document.getElementById('guide-count'),
+        status: document.getElementById('guide-status'),
+        close: document.getElementById('guide-close'),
+      },
+      api: this.api,
+      onPlay: (url) => {
+        this.#syncGuideButton();
+        this.playback?.load(url);
+      },
+      currentUrl: () => (this.playback?.current?.mode === 'magenta' ? this.elements.player.getURL?.() : ''),
+    });
     this.searchController = new SearchController({
       api: this.api,
       elements: {
@@ -111,6 +127,7 @@ class FloatingApp {
         setLocalDrag: (active) => this.#setLocalDrag(active),
         openLocal: (result) => this.#openLocalResult(result),
         openMenu: () => this.toggleMenu(true),
+        openGuide: () => this.toggleGuide(true),
         setAccount: (account) => this.#paintAccount(account),
       },
     });
@@ -198,7 +215,9 @@ class FloatingApp {
     document.getElementById('minimize').addEventListener('click', () => this.api.minimize());
     this.elements.pin.addEventListener('click', () => this.api.togglePin());
     document.getElementById('previous').addEventListener('click', () => void this.playback?.neighbour(false));
-    document.getElementById('back').addEventListener('click', () => this.playback?.back());
+    this.guidePanel.bind();
+    document.getElementById('guide').addEventListener('click', (event) => { event.stopPropagation(); this.toggleGuide(); });
+    document.getElementById('guide-close').addEventListener('click', () => this.#syncGuideButton());
     document.getElementById('next').addEventListener('click', () => void this.playback?.neighbour(true));
     this.elements.playlist.addEventListener('click', (event) => { event.stopPropagation(); this.togglePlaylist(); });
     this.elements['playlist-close'].addEventListener('click', () => this.togglePlaylist(false));
@@ -206,10 +225,9 @@ class FloatingApp {
     this.elements.settings.addEventListener('click', (event) => { event.stopPropagation(); this.toggleMenu(); });
     this.elements.help.addEventListener('click', (event) => { event.stopPropagation(); this.toggleHelp(); });
     this.elements['welcome-help'].addEventListener('click', () => this.toggleHelp(true));
-    this.elements['welcome-magenta'].addEventListener('click', () => {
-      if (!this.playback?.load(MAGENTA_TV_PAGE)) return;
-      this.searchController.reset();
-      this.toggleSearch(false);
+    this.elements['welcome-magenta'].addEventListener('click', (event) => {
+      event.stopPropagation();
+      this.toggleGuide(true);
     });
     this.elements['help-close'].addEventListener('click', () => this.toggleHelp(false));
     this.elements['help-overlay'].addEventListener('click', (event) => { if (event.target === this.elements['help-overlay']) this.toggleHelp(false); });
@@ -219,6 +237,7 @@ class FloatingApp {
     document.addEventListener('mousedown', (event) => {
       if (!this.elements['settings-menu'].hidden && !event.target.closest('#settings-menu') && event.target !== this.elements.settings) this.toggleMenu(false);
       if (!this.elements['playlist-panel'].hidden && !event.target.closest('#playlist-panel') && !event.target.closest('#playlist')) this.togglePlaylist(false);
+      if (this.guidePanel.isOpen() && !event.target.closest('#guide-panel') && !event.target.closest('#guide')) this.toggleGuide(false);
     });
     document.addEventListener('keydown', (event) => {
       const key = event.key.toLowerCase();
@@ -336,6 +355,10 @@ class FloatingApp {
     menu.style.bottom = `${Math.round(height - top - stageHeight + Math.max(12, stageHeight * 0.08))}px`;
     menu.style.maxWidth = `${Math.max(280, stageWidth - 24)}px`;
     menu.style.maxHeight = `${Math.max(150, stageHeight - 48)}px`;
+    const guide = document.getElementById('guide-panel');
+    guide.style.left = `${left + 8}px`;
+    guide.style.top = `${top + 36}px`;
+    guide.style.maxHeight = `${Math.max(140, stageHeight - 48)}px`;
     const playlist = this.elements['playlist-panel'];
     playlist.style.left = `${left + stageWidth - 8}px`;
     playlist.style.top = `${top + 36}px`;
@@ -497,6 +520,26 @@ class FloatingApp {
       });
       list.append(button);
     });
+  }
+
+  toggleGuide(force) {
+    const show = force === undefined ? !this.guidePanel.isOpen() : Boolean(force);
+    if (show) {
+      this.toggleMenu(false);
+      this.toggleHelp(false);
+      this.toggleSearch(false);
+      this.togglePlaylist(false);
+      this.#showToolbar();
+    }
+    this.guidePanel.toggle(show);
+    this.#syncGuideButton();
+  }
+
+  #syncGuideButton() {
+    const open = this.guidePanel.isOpen();
+    const button = document.getElementById('guide');
+    button.classList.toggle('active', open);
+    button.setAttribute('aria-expanded', String(open));
   }
 
   togglePlaylist(force) {
@@ -753,8 +796,10 @@ class FloatingApp {
         break;
       case 'search': this.toggleSearch(true); break;
       case 'help': this.toggleHelp(); break;
+      case 'guide': this.toggleGuide(); break;
       case 'escape':
-        if (!this.elements['help-overlay'].hidden) this.toggleHelp(false);
+        if (this.guidePanel.isOpen()) this.toggleGuide(false);
+        else if (!this.elements['help-overlay'].hidden) this.toggleHelp(false);
         else if (!this.elements['settings-menu'].hidden) this.toggleMenu(false);
         else if (!this.elements['playlist-panel'].hidden) this.togglePlaylist(false);
         else if (this.searchController.isOpen()) this.toggleSearch(false);

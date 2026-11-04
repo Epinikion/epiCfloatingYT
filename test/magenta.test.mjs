@@ -54,49 +54,31 @@ test('opens MagentaTV as a page and refuses it without Widevine', () => {
   assert.equal(toasts.at(-1), 'MagentaTV braucht Widevine, das hier fehlt');
 });
 
-test('zaps channels and goes back inside MagentaTV', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout'] });
+test('zaps channels and opens the guide instead of MagentaTV pages', async () => {
   const inputs = [];
-  const loaded = [];
-  let wentBack = 0;
-  let canGoBack = true;
-  let url = 'https://www.magenta.tv/streamen-tv/vox/vox';
-  const player = {
-    src: '', addEventListener() {}, focus() {}, send() {},
-    sendInputEvent: (event) => inputs.push(event),
-    canGoBack: () => canGoBack,
-    goBack: () => { wentBack += 1; },
-    getURL: () => url,
-    loadURL: (next) => { loaded.push(next); url = next; },
-  };
+  let guides = 0;
+  const player = { src: '', addEventListener() {}, focus() {}, send() {}, sendInputEvent: (event) => inputs.push(event) };
   const toasts = [];
   const controller = new PlaybackController({
     player,
     baseUrl: 'http://127.0.0.1:3210',
     api: {},
-    hooks: { toast: (message) => toasts.push(message), setEmpty() {}, setPlaylist() {}, setQueue() {}, setTitle() {}, openMenu() {} },
+    hooks: { toast: (message) => toasts.push(message), setEmpty() {}, setPlaylist() {}, setQueue() {}, setTitle() {}, openMenu() {}, openGuide: () => { guides += 1; } },
   });
   assert.equal(controller.back(), false);
-  controller.load(MAGENTA_TV_PAGE);
+  assert.equal(controller.load('MagentaTV'), true);
+  assert.equal(player.src, '', 'the name opens the guide, not a MagentaTV page');
+  assert.equal(guides, 1);
+
+  controller.load('https://www.magenta.tv/streamen-tv/vox/vox');
+  assert.equal(player.src, 'https://www.magenta.tv/streamen-tv/vox/vox');
   assert.equal(await controller.neighbour(true), true);
   assert.deepEqual(inputs, [{ type: 'keyDown', keyCode: 'Up' }, { type: 'keyUp', keyCode: 'Up' }]);
   await controller.neighbour(false);
   assert.deepEqual(inputs.slice(2).map(({ keyCode }) => keyCode), ['Down', 'Down']);
   assert.deepEqual(toasts, ['Nächster Sender', 'Vorheriger Sender']);
-
-  // A step back the player catches falls back to the channel list.
   assert.equal(controller.back(), true);
-  assert.equal(wentBack, 1);
-  t.mock.timers.tick(1500);
-  assert.deepEqual(loaded, [MAGENTA_TV_PAGE]);
-
-  // Without history the channel list is the last stop.
-  canGoBack = false;
-  assert.equal(controller.back(), false);
-  assert.equal(toasts.at(-1), 'Keine vorherige Seite');
-  url = 'https://www.magenta.tv/streamen-tv/zdf/zdf';
-  assert.equal(controller.back(), true);
-  assert.deepEqual(loaded, [MAGENTA_TV_PAGE, MAGENTA_TV_PAGE]);
+  assert.equal(guides, 2);
 });
 
 test('passes up and down to MagentaTV and maps back keys to going back', () => {
@@ -115,25 +97,31 @@ test('passes up and down to MagentaTV and maps back keys to going back', () => {
   assert.deepEqual(messages, ['back', 'back', 'volume-step']);
 });
 
-test('goes back when the page reports the mouse back button', async () => {
+test('opens the guide when the page reports the mouse back button', async () => {
   const listeners = new Map();
-  let wentBack = 0;
-  let url = 'https://www.magenta.tv/streamen-tv/zdf/zdf';
-  const player = {
-    src: '', focus() {}, send() {},
-    addEventListener: (type, listener) => listeners.set(type, listener),
-    canGoBack: () => true,
-    goBack: () => { wentBack += 1; url = MAGENTA_TV_PAGE; },
-    getURL: () => url,
-  };
+  let guides = 0;
+  const player = { src: '', focus() {}, send() {}, addEventListener: (type, listener) => listeners.set(type, listener) };
   const controller = new PlaybackController({
     player,
     baseUrl: 'http://127.0.0.1:3210',
     api: {},
-    hooks: { toast() {}, setEmpty() {}, setPlaylist() {}, setQueue() {}, setTitle() {}, openMenu() {} },
+    hooks: { toast() {}, setEmpty() {}, setPlaylist() {}, setQueue() {}, setTitle() {}, openMenu() {}, openGuide: () => { guides += 1; } },
   });
-  controller.load(MAGENTA_TV_PAGE);
+  controller.load('https://www.magenta.tv/streamen-tv/zdf/zdf');
   listeners.get('ipc-message')({ channel: 'guest-event', args: [{ type: 'history-back', payload: {} }] });
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(wentBack, 1);
+  assert.equal(guides, 1);
+});
+
+test('keeps only the timeline row of the MagentaTV player', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const preload = await readFile(new URL('../src/guest/guest-preload.cjs', import.meta.url), 'utf8');
+  const css = preload.match(/MAGENTA_PLAYER_CSS = `([^`]*)`/)?.[1] || '';
+  for (const hidden of ['#PLAYER-CLOSE', '#PLAYER-RECORD', '#PLAYER-VOLUME', '#PLAYER-INFO', '#PLAYER-SETTINGS', '#PLAYER-FULLSCREEN', '[data-lane]']) {
+    assert.ok(css.includes(hidden), hidden);
+  }
+  for (const kept of ['PLAYER-PROGRESS', 'PLAYER-PLAY', 'PLAYER-SKIP-BACKWARD', 'PLAYER-RESTART', 'BUTTON-BAR-2']) {
+    assert.ok(!css.includes(kept), kept);
+  }
+  assert.match(preload, /if \(isMagenta && isTop\) webFrame\.insertCSS\(MAGENTA_PLAYER_CSS\)/);
 });

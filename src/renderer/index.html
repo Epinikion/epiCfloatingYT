@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https://i.ytimg.com; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https://i.ytimg.com https://ngiss.t-online.de; style-src 'self' 'unsafe-inline'; script-src 'self'" />
     <title>FloatingYT</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
@@ -12,7 +12,7 @@
       <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></symbol>
       <symbol id="i-min" viewBox="0 0 24 24"><path d="M5 12h14" /></symbol>
       <symbol id="i-pin" viewBox="0 0 24 24"><path d="M8 4h8l-1 6 3 3H6l3-3-1-6zM12 13v7" /></symbol>
-      <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" /></symbol>
+      <symbol id="i-guide" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2" /><path d="M8 21h8M7 9h4M7 13h7" /></symbol>
       <symbol id="i-prev" viewBox="0 0 24 24"><path d="M18 6L9 12l9 6V6zM6 5v14" /></symbol>
       <symbol id="i-next" viewBox="0 0 24 24"><path d="M6 6l9 6-9 6V6zM18 5v14" /></symbol>
       <symbol id="i-playlist" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h7" /><circle cx="4.5" cy="6" r="1" /><circle cx="4.5" cy="12" r="1" /><circle cx="4.5" cy="18" r="1" /></symbol>
@@ -40,7 +40,7 @@
         <div id="search-results" role="listbox" aria-label="Suchergebnisse" hidden></div>
         <div class="welcome-actions">
           <span class="welcome-note"><kbd>↑</kbd><kbd>↓</kbd> auswählen · <kbd>Enter</kbd> abspielen · Videos/Ordner ablegen</span>
-          <button id="welcome-magenta" type="button">MagentaTV öffnen</button>
+          <button id="welcome-magenta" type="button">MagentaTV-Programm</button>
           <button id="welcome-help" type="button">Hilfe &amp; Tastenkürzel</button>
         </div>
       </section>
@@ -55,7 +55,7 @@
       <button id="close" title="Schließen (Strg+W)" aria-label="Schließen"><svg><use href="#i-close" /></svg></button>
       <button id="minimize" title="Minimieren" aria-label="Minimieren"><svg><use href="#i-min" /></svg></button>
       <button id="pin" title="Immer im Vordergrund (Strg+P)" aria-label="Immer im Vordergrund"><svg><use href="#i-pin" /></svg></button>
-      <button id="back" class="magenta-only" title="Zurück (Alt+Links)" aria-label="Zurück"><svg><use href="#i-back" /></svg></button>
+      <button id="guide" class="magenta-only" title="TV-Programm (E)" aria-label="TV-Programm" aria-expanded="false"><svg><use href="#i-guide" /></svg></button>
       <button id="previous" class="playlist-only" title="Vorheriges Video (Strg+Links)" aria-label="Vorheriges Video"><svg><use href="#i-prev" /></svg></button>
       <button id="next" class="playlist-only" title="Nächstes Video (Strg+Rechts)" aria-label="Nächstes Video"><svg><use href="#i-next" /></svg></button>
       <button id="playlist" class="queue-list-only" title="Playlist anzeigen (Strg+Umschalt+P)" aria-label="Playlist anzeigen" aria-expanded="false"><svg><use href="#i-playlist" /></svg></button>
@@ -64,6 +64,16 @@
       <button id="help" title="Hilfe und Tastenkürzel (F1)" aria-label="Hilfe und Tastenkürzel"><svg><use href="#i-help" /></svg></button>
       <div id="drag-region"><span id="video-title"><span></span></span></div>
     </header>
+
+    <section id="guide-panel" role="dialog" aria-label="TV-Programm" hidden>
+      <header class="playlist-header">
+        <div><strong>TV-Programm</strong><span id="guide-count"></span></div>
+        <button id="guide-close" type="button" title="TV-Programm schließen" aria-label="TV-Programm schließen"><svg><use href="#i-close" /></svg></button>
+      </header>
+      <input id="guide-search" type="search" spellcheck="false" autocomplete="off" placeholder="Sender, Nummer oder Sendung suchen …" aria-label="Sender suchen" />
+      <div id="guide-status" role="status" aria-live="polite"></div>
+      <div id="guide-list" aria-label="Sender"></div>
+    </section>
 
     <section id="playlist-panel" role="dialog" aria-label="Playlist" hidden>
       <header class="playlist-header">
@@ -127,7 +137,8 @@
             <div><dt><kbd>Strg</kbd><span>+</span><kbd>←</kbd></dt><dd>Vorheriger Titel</dd></div>
             <div><dt><kbd>Strg</kbd><span>+</span><kbd>→</kbd></dt><dd>Nächster Titel</dd></div>
             <div><dt><kbd>↑</kbd><span>/</span><kbd>↓</kbd></dt><dd>MagentaTV: nächster / vorheriger Sender</dd></div>
-            <div><dt><kbd>Alt</kbd><span>+</span><kbd>←</kbd><span>oder</span><kbd>Rücktaste</kbd></dt><dd>MagentaTV: zurück zur vorigen Seite</dd></div>
+            <div><dt><kbd>E</kbd></dt><dd>MagentaTV: TV-Programm aller Sender öffnen / schließen</dd></div>
+            <div><dt><kbd>Alt</kbd><span>+</span><kbd>←</kbd><span>oder</span><kbd>Rücktaste</kbd></dt><dd>MagentaTV: TV-Programm öffnen</dd></div>
             <div><dt><kbd>Strg</kbd><span>+</span><kbd>Shift</kbd><span>+</span><kbd>P</kbd></dt><dd>Playlist anzeigen / schließen</dd></div>
             <div><dt><span class="gesture">Playlist-Symbol</span></dt><dd>Lokale oder YouTube-Warteschlange anzeigen und Titel direkt wählen</dd></div>
             <div><dt><kbd>Strg</kbd><span>+</span><kbd>V</kbd></dt><dd>YouTube-, Twitch- oder MagentaTV-Link aus der Zwischenablage laden</dd></div>

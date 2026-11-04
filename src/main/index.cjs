@@ -11,6 +11,7 @@ const { VideoMetadataService } = require('./video-metadata.cjs');
 const { VideoSearchService } = require('./video-search.cjs');
 const { WindowController } = require('./window-controller.cjs');
 const { importCookieFile } = require('./cookie-file.cjs');
+const { MagentaGuide } = require('./magenta-guide.cjs');
 
 const ROOT = path.join(__dirname, '..', '..');
 const PARTITION = 'persist:floatingyt';
@@ -69,7 +70,8 @@ function findStartUrl(argv) {
   return argv.slice(1).find((argument) => /^(https?:\/\/)?([\w-]+\.)*(youtube\.com|youtube-nocookie\.com|youtu\.be|twitch\.tv)\//i.test(argument)) || null;
 }
 
-function registerIpc({ resolver, search, metadata, cookieFile }) {
+function registerIpc({ resolver, search, metadata, cookieFile, guide }) {
+  ipcMain.handle('magenta:guide', () => guide.guide());
   ipcMain.handle('app:widevine', () => widevine);
   ipcMain.handle('app:get-state', () => ({
     ...store.value,
@@ -159,7 +161,7 @@ if (!app.requestSingleInstanceLock()) {
     const youtubeSession = await configureYouTubeSession();
     const search = new VideoSearchService({ fetchImpl: youtubeSession.fetch.bind(youtubeSession) });
     const metadata = new VideoMetadataService({ fetchImpl: youtubeSession.fetch.bind(youtubeSession) });
-    registerIpc({ resolver, search, metadata, cookieFile });
+    registerIpc({ resolver, search, metadata, cookieFile, guide: new MagentaGuide() });
     controller = new WindowController({
       BrowserWindow,
       screen,

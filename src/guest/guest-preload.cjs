@@ -268,8 +268,18 @@ function installMouseBackReporter() {
   }, true);
 }
 
+// The app's guide replaces MagentaTV's navigation, so its player keeps only
+// the timeline with the buttons that move along it. The ids are the player's
+// own and stable; sign-in and cookie dialogs stay untouched.
+const MAGENTA_PLAYER_CSS = `
+#PLAYER-CLOSE, #PLAYER-RECORD, #PLAYER-VOLUME, #PLAYER-VOLUME-SLIDER-BAR,
+#PLAYER-VOLUME-SLIDER-BUTTON, #PLAYER-INFO, #PLAYER-SETTINGS, #PLAYER-FULLSCREEN,
+[data-lane], [id^="STRUCTURED-LANE-"] { display: none !important; }
+`;
+
 function boot() {
   if (isTop) installDropBridge();
+  if (isMagenta && isTop) webFrame.insertCSS(MAGENTA_PLAYER_CSS);
   if (isTop && !isLocal) installEditingReporter();
   if (isMagenta && isTop) installMouseBackReporter();
   if (isLocal) {

@@ -217,6 +217,7 @@ class WindowController {
       return true;
     }
     if (fromGuest && key === 'f') { this.toggleFullscreen(); return true; }
+    if (fromGuest && !control && key === 'e' && this.#guestIsMagenta()) { this.send('app:shortcut', { name: 'guide' }); return true; }
     if (key === 'escape' && (this.fullscreen || this.window.isFullScreen())) { this.leaveFullscreen(); return true; }
     if (key === 'escape') {
       this.send('app:shortcut', { name: 'escape' });

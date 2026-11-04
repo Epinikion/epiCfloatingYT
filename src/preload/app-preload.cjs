@@ -67,6 +67,7 @@ contextBridge.exposeInMainWorld('floatingApi', {
   setSoundBoost: (value) => ipcRenderer.invoke('settings:set-sound-boost', value),
   setGhost: (enabled) => ipcRenderer.invoke('settings:set-ghost', enabled === true),
   widevineStatus: () => ipcRenderer.invoke('app:widevine'),
+  magentaGuide: () => ipcRenderer.invoke('magenta:guide'),
   onLocalDrop: (callback) => {
     if (typeof callback !== 'function') return () => {};
     localDropListeners.add(callback);
