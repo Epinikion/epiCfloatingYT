@@ -475,3 +475,36 @@ test('remembers YouTube positions in the app and prefers newer history points', 
   await settle();
   assert.equal(resumeStore.get('viyGj8-jl5s'), null);
 });
+
+test('switches live streams to the watch page for a manual quality', async () => {
+  const player = new FakePlayer();
+  const toasts = [];
+  const controller = new PlaybackController({
+    player,
+    baseUrl: 'http://127.0.0.1:3210',
+    api: {},
+    hooks: { toast: (message) => toasts.push(message), setEmpty() {}, setPlaylist() {}, setTitle() {}, openMenu() {} },
+  });
+  const answerInfo = (info) => {
+    const command = player.commands.filter(({ payload }) => payload.name === 'info').at(-1);
+    player.emitGuest('player-info', { requestId: command.payload.requestId, info });
+  };
+
+  controller.load('https://www.youtube.com/watch?v=mZRsKuHQWuU');
+  controller.setPlayerOption('quality', 'hd1080');
+  answerInfo({ currentTime: 98981, duration: 50390, live: false });
+  await settle();
+  assert.equal(controller.current.mode, 'watch');
+  assert.equal(player.src, 'https://www.youtube.com/watch?v=mZRsKuHQWuU');
+  assert.equal(toasts.at(-1), 'Livestream: Auflösung wird über die YouTube-Seite gewählt …');
+
+  player.emitGuest('watch-status', { videoId: 'mZRsKuHQWuU', state: 1 });
+  await settle();
+  assert.deepEqual(player.commands.filter(({ payload }) => payload.name === 'quality').map(({ payload }) => payload.value), ['hd1080']);
+
+  controller.load('https://www.youtube.com/watch?v=mZRsKuHQWuU');
+  controller.setPlayerOption('quality', 'auto');
+  answerInfo({ currentTime: 98981, duration: 50390, live: true });
+  await settle();
+  assert.equal(player.src, 'http://127.0.0.1:3210/embed.html?v=mZRsKuHQWuU');
+});

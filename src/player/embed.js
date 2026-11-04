@@ -131,6 +131,8 @@ function playerInfo() {
     volume: player.getVolume?.() ?? 100,
     muted: player.isMuted?.() ?? false,
     currentTime: player.getCurrentTime?.() ?? 0,
+    duration: player.getDuration?.() ?? 0,
+    live: Boolean(player.getVideoData?.()?.isLive),
     tracks: tracks.map((track) => ({ code: track.languageCode, name: track.languageName?.name || track.displayName || track.languageCode })),
     track: active?.languageCode || null,
   };

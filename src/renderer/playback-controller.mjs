@@ -492,8 +492,22 @@ export class PlaybackController {
       const info = await this.requestInfo();
       if (generation !== this.generation || !this.current || this.current.mode !== 'embed') return;
       const currentTime = Math.max(0, Math.floor(Number(info?.currentTime) || this.current.start || 0));
+      const duration = Number(info?.duration) || 0;
+      // A live stream's time counts from the broadcast start and can lie past the
+      // seekable window, so a start parameter would leave the reloaded embed blank.
+      const live = Boolean(info?.live) || (duration > 0 && currentTime > duration);
       const quality = this.preferredQuality === 'auto' ? null : this.preferredQuality;
-      this.current = { ...this.current, start: currentTime, quality };
+      if (live && quality) {
+        // A live embed stalls when a quality is forced; the watch page switches it.
+        this.current = { ...this.current, start: 0, quality: null, mode: 'watch' };
+        this.pendingQuality = quality;
+        this.qualityCommandSent = false;
+        this.player.src = buildWatchUrl(this.current);
+        this.player.focus();
+        this.hooks.toast('Livestream: Auflösung wird über die YouTube-Seite gewählt …');
+        return;
+      }
+      this.current = { ...this.current, start: live ? 0 : currentTime, quality };
       this.player.src = buildEmbedUrl(this.baseUrl, this.current);
       this.player.focus();
       this.hooks.toast('Auflösung wird im Embed neu geladen …');
