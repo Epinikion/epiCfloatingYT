@@ -164,7 +164,7 @@ export class GuidePanel {
     item.title = [channel.title, channel.now && `${channel.now.title}${channel.now.subtitle ? ` · ${channel.now.subtitle}` : ''}`].filter(Boolean).join('\n');
     item.addEventListener('click', () => {
       this.close();
-      this.onPlay(channel.url);
+      this.onPlay(channel.url, channel.title);
     });
     return item;
   }

@@ -277,11 +277,20 @@ const MAGENTA_PLAYER_CSS = `
 [data-lane], [id^="STRUCTURED-LANE-"] { display: none !important; }
 `;
 
+// Reports when MagentaTV's video loads and plays, so the app can cover the
+// page's own spinner while a channel switches.
+function installMagentaVideoReporter() {
+  const report = (state) => () => send('magenta-video', { state });
+  for (const name of ['loadstart', 'waiting', 'emptied']) document.addEventListener(name, report('loading'), true);
+  document.addEventListener('playing', report('playing'), true);
+}
+
 function boot() {
   if (isTop) installDropBridge();
   if (isMagenta && isTop) webFrame.insertCSS(MAGENTA_PLAYER_CSS);
   if (isTop && !isLocal) installEditingReporter();
   if (isMagenta && isTop) installMouseBackReporter();
+  if (isMagenta && isTop) installMagentaVideoReporter();
   if (isLocal) {
     ensureLocalFilters();
     installLocalGestures();

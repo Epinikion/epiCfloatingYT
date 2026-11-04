@@ -27,6 +27,23 @@ button svg { width: 15px; height: 15px; display: block; fill: none; stroke: curr
 #player.resize-frozen { transform-origin: 0 0; will-change: transform; }
 #resize-snapshot { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
 #resize-snapshot[hidden] { display: none; }
+/* Covers MagentaTV's own loading page while a channel switches. */
+#channel-cover {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #000;
+  color: #b9b9bf;
+  font-size: 12px;
+  pointer-events: none;
+}
+#channel-cover[hidden] { display: none; }
+.channel-spinner { width: 22px; height: 22px; border: 2px solid rgba(255,255,255,.18); border-top-color: var(--accent); border-radius: 50%; animation: search-spin .8s linear infinite; }
 
 #ambient {
   position: absolute;
@@ -299,6 +316,9 @@ body.has-queue-list .queue-list-only { display: grid !important; }
   box-shadow: 0 14px 40px rgba(0,0,0,.5);
 }
 #guide-panel[hidden] { display: none; }
+/* Panels over the welcome screen's window-drag area keep their own mouse input;
+   otherwise Windows takes clicks and the wheel for moving the window. */
+#guide-panel, #playlist-panel, #settings-menu { -webkit-app-region: no-drag; }
 #guide-count { color: #77777f; font-size: 10px; font-variant-numeric: tabular-nums; }
 #guide-close { width: 27px; height: 25px; display: grid; flex: none; place-items: center; padding: 0; border: 0; border-radius: 5px; background: transparent; color: #aaaab0; cursor: pointer; }
 #guide-close:hover { color: #e11d48; }

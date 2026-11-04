@@ -125,3 +125,32 @@ test('keeps only the timeline row of the MagentaTV player', async () => {
   }
   assert.match(preload, /if \(isMagenta && isTop\) webFrame\.insertCSS\(MAGENTA_PLAYER_CSS\)/);
 });
+
+test('covers a channel switch until MagentaTV plays and never the sign-in', async () => {
+  const listeners = new Map();
+  const loading = [];
+  const player = { src: '', focus() {}, send() {}, sendInputEvent() {}, addEventListener: (type, listener) => listeners.set(type, listener) };
+  const controller = new PlaybackController({
+    player,
+    baseUrl: 'http://127.0.0.1:3210',
+    api: {},
+    hooks: { toast() {}, setEmpty() {}, setPlaylist() {}, setQueue() {}, setTitle() {}, openMenu() {}, channelLoading: (...args) => loading.push(args) },
+  });
+  const guest = async (type, payload) => {
+    listeners.get('ipc-message')({ channel: 'guest-event', args: [{ type, payload }] });
+    await new Promise((resolve) => setImmediate(resolve));
+  };
+  controller.load('https://www.magenta.tv/streamen-tv/zdf/zdf');
+  await guest('magenta-video', { state: 'playing' });
+  await controller.neighbour(true);
+  await guest('magenta-video', { state: 'loading' });
+  listeners.get('did-navigate')({ url: 'https://accounts.login.idm.telekom.com/oauth2/auth' });
+  listeners.get('did-navigate')({ url: 'https://www.magenta.tv/streamen-tv/vox/vox' });
+  assert.deepEqual(loading, [[true], [false], [true, 'Nächster Sender'], [true], [false]]);
+});
+
+test('keeps panels over the welcome drag area clickable', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const styles = await readFile(new URL('../src/renderer/styles.css', import.meta.url), 'utf8');
+  assert.match(styles, /#guide-panel, #playlist-panel, #settings-menu \{ -webkit-app-region: no-drag; \}/);
+});

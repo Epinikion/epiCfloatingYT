@@ -27,6 +27,7 @@ function localStorageOrNull() {
 }
 
 const BLANK_FRAMES_FOR_PROTECTED = 25;
+const CHANNEL_COVER_MAX_MS = 8000;
 
 class FloatingApp {
   constructor(api) {
@@ -74,8 +75,9 @@ class FloatingApp {
         close: document.getElementById('guide-close'),
       },
       api: this.api,
-      onPlay: (url) => {
+      onPlay: (url, title) => {
         this.#syncGuideButton();
+        this.#setChannelLoading(true, title);
         this.playback?.load(url);
       },
       currentUrl: () => (this.playback?.current?.mode === 'magenta' ? this.elements.player.getURL?.() : ''),
@@ -128,6 +130,7 @@ class FloatingApp {
         openLocal: (result) => this.#openLocalResult(result),
         openMenu: () => this.toggleMenu(true),
         openGuide: () => this.toggleGuide(true),
+        channelLoading: (loading, label) => this.#setChannelLoading(loading, label),
         setAccount: (account) => this.#paintAccount(account),
       },
     });
@@ -520,6 +523,21 @@ class FloatingApp {
       });
       list.append(button);
     });
+  }
+
+  // A cover over MagentaTV's own loading page; it lifts when the video plays
+  // and, so a dialog of the page is never hidden for long, after a few seconds.
+  #setChannelLoading(loading, label) {
+    const cover = document.getElementById('channel-cover');
+    clearTimeout(this.channelCoverTimer);
+    if (!loading) {
+      cover.hidden = true;
+      return;
+    }
+    if (label) document.getElementById('channel-cover-label').textContent = `${label} wird geladen …`;
+    else if (cover.hidden) document.getElementById('channel-cover-label').textContent = 'Sender wird geladen …';
+    cover.hidden = false;
+    this.channelCoverTimer = setTimeout(() => { cover.hidden = true; }, CHANNEL_COVER_MAX_MS);
   }
 
   toggleGuide(force) {

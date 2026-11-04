@@ -140,6 +140,7 @@ export class PlaybackController {
     this.hooks.setPlaylist(false);
     this.hooks.setQueue?.(null);
     this.hooks.setTitle('MagentaTV');
+    this.hooks.channelLoading?.(true);
     this.player.src = parsed.url;
     this.player.focus();
     return true;
@@ -263,6 +264,7 @@ export class PlaybackController {
     }
     if (this.current.mode === 'magenta') {
       // MagentaTV zaps with the arrow keys of its own player.
+      this.hooks.channelLoading?.(true, forward ? 'Nächster Sender' : 'Vorheriger Sender');
       this.#pressInPage(forward ? 'Up' : 'Down');
       this.hooks.toast(forward ? 'Nächster Sender' : 'Vorheriger Sender');
       return true;
@@ -329,6 +331,13 @@ export class PlaybackController {
     this.player.addEventListener('will-navigate', (event) => {
       if (!this.#isAllowedNavigation(event.url)) this.player.stop();
     });
+    // The Telekom sign-in must stay visible, so a channel cover ends there.
+    this.player.addEventListener('did-navigate', (event) => {
+      if (this.current?.mode !== 'magenta') return;
+      try {
+        if (!/(^|\.)magenta\.tv$/i.test(new URL(event.url).hostname)) this.hooks.channelLoading?.(false);
+      } catch {}
+    });
     this.player.addEventListener('page-title-updated', (event) => {
       if (this.current?.mode !== 'magenta') return;
       const title = String(event.title || '').replace(/^MagentaTV\s*[-–]\s*/, '').trim();
@@ -348,6 +357,10 @@ export class PlaybackController {
     if (type === 'fullscreen-toggle') return this.api.toggleFullscreen();
     if (type === 'fullscreen-leave') return this.api.leaveFullscreen();
     if (type === 'history-back') { this.back(); return; }
+    if (type === 'magenta-video') {
+      if (this.current?.mode === 'magenta') this.hooks.channelLoading?.(payload.state === 'loading');
+      return;
+    }
     if (type === 'local-drag') { this.hooks.setLocalDrag?.(Boolean(payload.active)); return; }
     if (type === 'local-drop-result') { this.hooks.openLocal?.(payload); return; }
     if (type === 'boost-status') {
