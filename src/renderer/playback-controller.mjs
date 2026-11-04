@@ -1,6 +1,8 @@
 import { buildTwitchUrl, parseTwitchInput } from '../shared/twitch-url.mjs';
 import { buildEmbedUrl, buildWatchUrl, isPersonalPlaylist, parseYouTubeInput } from '../shared/youtube-url.mjs';
-import { isMagentaHost, parseMagentaInput } from '../shared/magenta-url.mjs';
+import { MAGENTA_TV_PAGE, isMagentaHost, parseMagentaInput } from '../shared/magenta-url.mjs';
+
+const BACK_SETTLE_MS = 1500;
 
 const BLOCKED_ERRORS = new Set([100, 101, 150, 'timeout']);
 const LOCAL_MEDIA_ID = /^[a-f0-9]{36}$/;
@@ -135,9 +137,42 @@ export class PlaybackController {
     this.hooks.setPlaylist(false);
     this.hooks.setQueue?.(null);
     this.hooks.setTitle('MagentaTV');
+    // Going back must end on the first MagentaTV page, not on whatever the
+    // player showed before, so its history is cleared once that page loads.
+    this.clearHistoryOnLoad = true;
     this.player.src = parsed.url;
     this.player.focus();
     return true;
+  }
+
+  // MagentaTV has no back button of its own outside the player overlay.
+  back() {
+    if (this.current?.mode !== 'magenta') return false;
+    const before = this.player.getURL?.() || '';
+    if (!this.player.canGoBack?.()) {
+      if (before === MAGENTA_TV_PAGE) {
+        this.hooks.toast('Keine vorherige Seite');
+        return false;
+      }
+      this.player.loadURL(MAGENTA_TV_PAGE);
+      return true;
+    }
+    this.player.goBack();
+    // The MagentaTV player sometimes catches a step back and stays on the
+    // channel; the channel list is then the place the step was meant for.
+    const generation = this.generation;
+    setTimeout(() => {
+      if (generation !== this.generation || this.current?.mode !== 'magenta') return;
+      if ((this.player.getURL?.() || '') === before) this.player.loadURL(MAGENTA_TV_PAGE);
+    }, BACK_SETTLE_MS);
+    return true;
+  }
+
+  #pressInPage(keyCode) {
+    try {
+      this.player.sendInputEvent({ type: 'keyDown', keyCode });
+      this.player.sendInputEvent({ type: 'keyUp', keyCode });
+    } catch {}
   }
 
   #beginSession() {
@@ -243,8 +278,10 @@ export class PlaybackController {
       return false;
     }
     if (this.current.mode === 'magenta') {
-      this.hooks.toast('Sender wechselst du auf der MagentaTV-Seite');
-      return false;
+      // MagentaTV zaps with the arrow keys of its own player.
+      this.#pressInPage(forward ? 'Up' : 'Down');
+      this.hooks.toast(forward ? 'Nächster Sender' : 'Vorheriger Sender');
+      return true;
     }
     if (isPersonalPlaylist(this.current.list)) {
       if (this.#stepQueue(forward)) return true;
@@ -308,6 +345,16 @@ export class PlaybackController {
     this.player.addEventListener('will-navigate', (event) => {
       if (!this.#isAllowedNavigation(event.url)) this.player.stop();
     });
+    this.player.addEventListener('did-navigate', (event) => {
+      if (!this.clearHistoryOnLoad || this.current?.mode !== 'magenta') return;
+      try {
+        if (!isMagentaHost(new URL(event.url).hostname)) return;
+      } catch {
+        return;
+      }
+      this.clearHistoryOnLoad = false;
+      try { this.player.clearHistory?.(); } catch {}
+    });
     this.player.addEventListener('page-title-updated', (event) => {
       if (this.current?.mode !== 'magenta') return;
       const title = String(event.title || '').replace(/^MagentaTV\s*[-–]\s*/, '').trim();
@@ -326,6 +373,7 @@ export class PlaybackController {
     if (type === 'drag-end') return this.api.dragEnd();
     if (type === 'fullscreen-toggle') return this.api.toggleFullscreen();
     if (type === 'fullscreen-leave') return this.api.leaveFullscreen();
+    if (type === 'history-back') { this.back(); return; }
     if (type === 'local-drag') { this.hooks.setLocalDrag?.(Boolean(payload.active)); return; }
     if (type === 'local-drop-result') { this.hooks.openLocal?.(payload); return; }
     if (type === 'boost-status') {

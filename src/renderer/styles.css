@@ -251,7 +251,8 @@ body.title-on-light #video-title span { color: #141417; }
   box-shadow: 0 0 0 1.5px rgba(10,10,12,.85);
 }
 #settings[data-login="signed-out"]::after, #settings[data-login="error"]::after { background: #f59e0b; }
-.playlist-only { display: none !important; }
+.playlist-only, .magenta-only { display: none !important; }
+body.magenta .magenta-only { display: grid !important; }
 body.has-playlist .playlist-only { display: grid !important; }
 .queue-list-only { display: none !important; }
 body.has-queue-list .queue-list-only { display: grid !important; }

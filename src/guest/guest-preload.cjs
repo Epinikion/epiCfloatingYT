@@ -258,9 +258,20 @@ function installEditingReporter() {
   document.addEventListener('focusout', () => setTimeout(update, 0), true);
 }
 
+// The mouse's back button reaches the page, not the window, so the page
+// reports it for the app's own back step.
+function installMouseBackReporter() {
+  document.addEventListener('mouseup', (event) => {
+    if (event.button !== 3) return;
+    event.preventDefault();
+    send('history-back');
+  }, true);
+}
+
 function boot() {
   if (isTop) installDropBridge();
   if (isTop && !isLocal) installEditingReporter();
+  if (isMagenta && isTop) installMouseBackReporter();
   if (isLocal) {
     ensureLocalFilters();
     installLocalGestures();

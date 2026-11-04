@@ -12,6 +12,7 @@
       <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></symbol>
       <symbol id="i-min" viewBox="0 0 24 24"><path d="M5 12h14" /></symbol>
       <symbol id="i-pin" viewBox="0 0 24 24"><path d="M8 4h8l-1 6 3 3H6l3-3-1-6zM12 13v7" /></symbol>
+      <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" /></symbol>
       <symbol id="i-prev" viewBox="0 0 24 24"><path d="M18 6L9 12l9 6V6zM6 5v14" /></symbol>
       <symbol id="i-next" viewBox="0 0 24 24"><path d="M6 6l9 6-9 6V6zM18 5v14" /></symbol>
       <symbol id="i-playlist" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h7" /><circle cx="4.5" cy="6" r="1" /><circle cx="4.5" cy="12" r="1" /><circle cx="4.5" cy="18" r="1" /></symbol>
@@ -54,6 +55,7 @@
       <button id="close" title="Schließen (Strg+W)" aria-label="Schließen"><svg><use href="#i-close" /></svg></button>
       <button id="minimize" title="Minimieren" aria-label="Minimieren"><svg><use href="#i-min" /></svg></button>
       <button id="pin" title="Immer im Vordergrund (Strg+P)" aria-label="Immer im Vordergrund"><svg><use href="#i-pin" /></svg></button>
+      <button id="back" class="magenta-only" title="Zurück (Alt+Links)" aria-label="Zurück"><svg><use href="#i-back" /></svg></button>
       <button id="previous" class="playlist-only" title="Vorheriges Video (Strg+Links)" aria-label="Vorheriges Video"><svg><use href="#i-prev" /></svg></button>
       <button id="next" class="playlist-only" title="Nächstes Video (Strg+Rechts)" aria-label="Nächstes Video"><svg><use href="#i-next" /></svg></button>
       <button id="playlist" class="queue-list-only" title="Playlist anzeigen (Strg+Umschalt+P)" aria-label="Playlist anzeigen" aria-expanded="false"><svg><use href="#i-playlist" /></svg></button>
@@ -124,6 +126,8 @@
           <dl>
             <div><dt><kbd>Strg</kbd><span>+</span><kbd>←</kbd></dt><dd>Vorheriger Titel</dd></div>
             <div><dt><kbd>Strg</kbd><span>+</span><kbd>→</kbd></dt><dd>Nächster Titel</dd></div>
+            <div><dt><kbd>↑</kbd><span>/</span><kbd>↓</kbd></dt><dd>MagentaTV: nächster / vorheriger Sender</dd></div>
+            <div><dt><kbd>Alt</kbd><span>+</span><kbd>←</kbd><span>oder</span><kbd>Rücktaste</kbd></dt><dd>MagentaTV: zurück zur vorigen Seite</dd></div>
             <div><dt><kbd>Strg</kbd><span>+</span><kbd>Shift</kbd><span>+</span><kbd>P</kbd></dt><dd>Playlist anzeigen / schließen</dd></div>
             <div><dt><span class="gesture">Playlist-Symbol</span></dt><dd>Lokale oder YouTube-Warteschlange anzeigen und Titel direkt wählen</dd></div>
             <div><dt><kbd>Strg</kbd><span>+</span><kbd>V</kbd></dt><dd>YouTube-, Twitch- oder MagentaTV-Link aus der Zwischenablage laden</dd></div>

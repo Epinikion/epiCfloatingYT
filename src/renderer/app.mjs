@@ -1,4 +1,4 @@
-import { MAGENTA_HOME } from '../shared/magenta-url.mjs';
+import { MAGENTA_TV_PAGE } from '../shared/magenta-url.mjs';
 import { isSupportedVideoLink } from '../shared/twitch-url.mjs';
 import { PlaybackController } from './playback-controller.mjs';
 import { ResumeStore } from './resume-store.mjs';
@@ -140,6 +140,7 @@ class FloatingApp {
       // of blank frames, so a dark scene does not switch them off.
       this.blankFrames = this.playback?.current?.mode === 'magenta' && !empty && isBlankFrame(frame) ? this.blankFrames + 1 : 0;
       const protectedVideo = this.blankFrames >= BLANK_FRAMES_FOR_PROTECTED;
+      document.body.classList.toggle('magenta', this.playback?.current?.mode === 'magenta' && !empty);
       document.body.classList.toggle('protected-video', protectedVideo);
       if (protectedVideo) {
         this.#paintToolbarTones(frame, true);
@@ -197,6 +198,7 @@ class FloatingApp {
     document.getElementById('minimize').addEventListener('click', () => this.api.minimize());
     this.elements.pin.addEventListener('click', () => this.api.togglePin());
     document.getElementById('previous').addEventListener('click', () => void this.playback?.neighbour(false));
+    document.getElementById('back').addEventListener('click', () => this.playback?.back());
     document.getElementById('next').addEventListener('click', () => void this.playback?.neighbour(true));
     this.elements.playlist.addEventListener('click', (event) => { event.stopPropagation(); this.togglePlaylist(); });
     this.elements['playlist-close'].addEventListener('click', () => this.togglePlaylist(false));
@@ -205,7 +207,7 @@ class FloatingApp {
     this.elements.help.addEventListener('click', (event) => { event.stopPropagation(); this.toggleHelp(); });
     this.elements['welcome-help'].addEventListener('click', () => this.toggleHelp(true));
     this.elements['welcome-magenta'].addEventListener('click', () => {
-      if (!this.playback?.load(MAGENTA_HOME)) return;
+      if (!this.playback?.load(MAGENTA_TV_PAGE)) return;
       this.searchController.reset();
       this.toggleSearch(false);
     });
@@ -742,6 +744,7 @@ class FloatingApp {
       case 'volume-step': this.playback?.adjustVolume(message.delta); break;
       case 'seek': this.playback?.seek(message.delta); break;
       case 'next': void this.playback?.neighbour(true); break;
+      case 'back': this.playback?.back(); break;
       case 'previous': void this.playback?.neighbour(false); break;
       case 'menu': this.toggleMenu(); break;
       case 'playlist':

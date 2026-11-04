@@ -140,6 +140,9 @@ class WindowController {
       this.saveWindowState(false, { size: this.window.getBounds() });
     });
     window.on('move', () => this.#scheduleStateSave());
+    window.on('app-command', (_event, command) => {
+      if (command === 'browser-backward') this.send('app:shortcut', { name: 'back' });
+    });
     window.on('close', () => this.saveWindowState(true));
     window.on('closed', () => {
       clearInterval(this.hoverTimer);
@@ -163,6 +166,12 @@ class WindowController {
     if (key === 'f1' && fromGuest) { this.send('app:shortcut', { name: 'help' }); return true; }
     // A focused text field of the page, such as a sign-in form, keeps its keys.
     if (fromGuest && this.guestEditing && !(control && key === 'w')) return false;
+    // MagentaTV zaps channels with its own up and down keys.
+    if (fromGuest && !control && !input.alt && !input.shift && ['arrowup', 'arrowdown'].includes(key) && this.#guestIsMagenta()) return false;
+    if (fromGuest && ((key === 'backspace' && !control && !input.alt) || (input.alt && key === 'arrowleft'))) {
+      this.send('app:shortcut', { name: 'back' });
+      return true;
+    }
     if (control && key === 'v') {
       const url = this.clipboard.readText().trim();
       if (url) this.send('app:shortcut', { name: 'load-url', url });
@@ -409,6 +418,14 @@ class WindowController {
     try {
       for (const frame of this.guest.mainFrame.framesInSubtree) frame.send('guest-visual', visual);
     } catch {}
+  }
+
+  #guestIsMagenta() {
+    try {
+      return /(^|\.)magenta\.tv$/i.test(new URL(this.guest?.getURL?.() || '').hostname);
+    } catch {
+      return false;
+    }
   }
 
   setGuestEditing(sender, editing) {
